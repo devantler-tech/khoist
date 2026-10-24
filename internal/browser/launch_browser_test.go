@@ -32,6 +32,13 @@ func launchBrowserProfile(t *testing.T, extra ...flags.Flag) (string, string) {
 	for _, flag := range extra {
 		browserLauncher = browserLauncher.Set(flag)
 	}
+	// Resolve the executable under the same deadline before launching: Rod's own
+	// resolution validates a downloaded browser without one.
+	bin, err := browserBinary(ctx, browserLauncher.Get(flags.Bin))
+	if err != nil {
+		t.Fatalf("resolve browser: %v", err)
+	}
+	browserLauncher = browserLauncher.Bin(bin)
 	profile := browserLauncher.Get(flags.UserDataDir)
 	controlURL, err := browserLauncher.Launch()
 	if err != nil {

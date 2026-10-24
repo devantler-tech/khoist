@@ -135,6 +135,9 @@ jobs:
       - name: Validate Go toolchain pins
         run: sh scripts/toolchain.test.sh
 
+      - name: Validate agent instruction shims
+        run: sh scripts/validate-agent-shims.test.sh
+
       - name: Validate chart behavior
         run: sh scripts/chart.test.sh
 
@@ -249,7 +252,10 @@ jobs:
     needs: plan
     if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
     name: Validate native Document queries
-    runs-on: ubuntu-latest
+    # The immutable 8.0.26 reference refuses Linux >=6.19 (SERVER-125742).
+    # Keep its real startup guard; use the hosted 6.8 kernel line until the
+    # reference is upgraded and proven on the newer hosted environment (#464).
+    runs-on: ubuntu-22.04
     timeout-minutes: 40
     permissions:
       contents: read

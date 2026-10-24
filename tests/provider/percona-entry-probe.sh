@@ -77,8 +77,11 @@ done
 available=true
 kube logs "$probe" -c mongod --tail=200 >"$work/log" 2>/dev/null || available=false
 status_pattern='([0-9]{1,2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
-grep -E "^khoist-probe (entry-sha256=[0-9a-f]{64}|entry=unreadable|err status=$status_pattern line=[0-9]{1,6}( stages=[0-9]{1,3} pipeline=$status_pattern(,$status_pattern){0,15})?|exit status=$status_pattern)$" \
+grep -E "^khoist-probe (entry-sha256=[0-9a-f]{64}|entry=unreadable|err status=$status_pattern line=[0-9]{1,6}( stages=[0-9]{1,3} pipeline=$status_pattern(,$status_pattern){0,15})?|pipeline line=[0-9]{1,6} statuses=$status_pattern(,$status_pattern){1,15}|version (mode=direct statuses=$status_pattern|mode=early statuses=$status_pattern(,$status_pattern){3}|mode=drain statuses=$status_pattern,$status_pattern)|version=unavailable|exit status=$status_pattern)$" \
 	"$work/log" >"$work/probe-lines" || true
+# JSON payloads are still untrusted log data. Admit one exact closed summary,
+# not arbitrary diagnostic fields, even when a candidate emits our marker.
+grep -E '^khoist-probe version-output( .+|=unavailable)$' "$work/log" >>"$work/probe-lines" || true
 other=$(($(wc -l <"$work/log") - $(wc -l <"$work/probe-lines")))
 
 # Each named outcome needs positive evidence. Anything else, including a shell killed before its
@@ -87,9 +90,27 @@ other=$(($(wc -l <"$work/log") - $(wc -l <"$work/probe-lines")))
 jq -Rnc --arg state "$state" --argjson available "$available" --argjson other "${other:-0}" \
 	--slurpfile pod <(jq -c '[.status.containerStatuses[]? | select(.name=="mongod")] | first // {}' \
 		"$work/probe.json" 2>/dev/null || printf '{}') '
+  def bounded: type=="number" and .>=0 and .<=2147483647 and floor==.;
+  def valid_summary:
+    type=="object" and keys==["classes","errors","lines","structured","unclassified"] and
+    (.lines|bounded) and (.structured|bounded) and (.unclassified|bounded) and
+    .structured+.unclassified<=.lines and
+    (.classes|type)=="array" and (.classes|length)<=7 and
+    all(.classes[]; IN("UnsupportedCPU","CommandLineRejected","InvalidStartupOption",
+      "UnknownStartupOption","PermissionDenied","ReadOnlyFilesystem","NoSpaceLeft")) and
+    (.classes|sort|unique)==(.classes|sort) and
+    (.errors|type)=="array" and (.errors|length)<=8 and (.errors|length)<=.structured and
+    all(.errors[]; type=="object" and keys==["code","id","severity"] and
+      (.severity=="E" or .severity=="F") and
+      (.id==null or (.id|bounded)) and (.code==null or (.code|bounded)));
   [inputs] as $lines |
+  ([$lines[]|select(startswith("khoist-probe version-output "))|
+    ltrimstr("khoist-probe version-output ")|(try fromjson catch null)]) as $summaries |
   ($pod[0] | .state.terminated // {}) as $terminated |
   ([$lines[] | select(startswith("khoist-probe exit ")) | capture("status=(?<s>[0-9]+)").s | tonumber] | last) as $entryExit |
+  ([$lines[] | select(startswith("khoist-probe version mode=")) |
+    capture("mode=(?<mode>[a-z]+) statuses=(?<statuses>[0-9,]+)") |
+    {mode,statuses:(.statuses|split(",")|map(tonumber))}]) as $versions |
   {probe:"entrypoint",
    outcome:(
      if $state=="Running" then "StillRunningAtDeadline"
@@ -107,6 +128,22 @@ jq -Rnc --arg state "$state" --argjson available "$available" --argjson other "$
        (if .stages==null then {} else
          {pipelineStages:(.stages|tonumber),pipelineStatuses:$pipeline,
           pipelineComplete:((.stages|tonumber)==($pipeline|length))} end)] | .[-8:]),
+   pipelines:([$lines[] | select(startswith("khoist-probe pipeline ")) |
+     capture("line=(?<line>[0-9]+) statuses=(?<statuses>[0-9,]+)") |
+     {line:(.line|tonumber),statuses:(.statuses|split(",")|map(tonumber))}] | .[-8:]),
+   versionOutcome:(if $available|not then "Incomplete"
+     elif ($versions|length)==0 and any($lines[]; .=="khoist-probe version=unavailable") then "Unavailable"
+     elif ($versions|map(.mode)|sort)==["direct","drain","early"] and
+       all($versions[].statuses[]; .>=0 and .<=255) and
+       (any($lines[]; .=="khoist-probe version=unavailable")|not) then "Observed"
+     else "Incomplete" end),
+   versionOutput:(if $available and ($summaries|length)==1 and ($summaries[0]|try valid_summary catch false) and
+       (any($lines[];.=="khoist-probe version-output=unavailable")|not) then
+       {outcome:"Observed",summary:$summaries[0]}
+     elif $available and ($summaries|length)==0 and
+       any($lines[];.=="khoist-probe version-output=unavailable") then {outcome:"Unavailable"}
+     else {outcome:"Incomplete"} end),
+   versions:$versions,
    entrypointExit:$entryExit,
    containerExit:(if ($terminated.exitCode|type)=="number" then $terminated.exitCode else null end),
    containerReason:(if ($terminated.reason|type)=="string" and ($terminated.reason|test("^[A-Za-z]{1,32}$"))
