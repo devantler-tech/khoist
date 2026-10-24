@@ -97,6 +97,12 @@ fi
 # Write probe lines to a saved copy of the container log. With errtrace the ERR trap also fires
 # inside command substitutions and pipelines, whose stdout is the entrypoint's own data.
 exec 47>&1
+# Record one entrypoint failure without putting diagnostic text on its stdout.
+# Arguments: the original exit status, source line, then every captured pipeline
+# status. The ERR trap expands them before any helper command changes PIPESTATUS.
+# Writes numeric records to descriptor 47, including the full stage count and at
+# most 16 statuses. Emit the compatible legacy record only for complete vectors;
+# the outer wrapper marks an incomplete retained vector rather than trusting it.
 _khoist_probe_error() {
 	local status=$1 line=$2 stages=$(($# - 2)) stage retained=0 pipeline=
 	shift 2
