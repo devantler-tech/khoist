@@ -29,6 +29,11 @@ README.md
 LICENSE
 .github/CODEOWNERS
 .claude/skills/maintain/SKILL.md
+# The shims carry a first-line heading for this repository's Markdown lint, so
+# the instance owns them and the check that enforces their exact shape.
+CLAUDE.md
+GEMINI.md
+scripts/validate-agent-shims.test.sh
 
 # --- Release / dependency / lint config the instance tailors ---
 # .golangci.yml is instance-owned on purpose: its depguard rule is a strict
