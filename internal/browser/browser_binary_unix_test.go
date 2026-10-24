@@ -82,6 +82,100 @@ func TestBrowserValidationStopsABlockedBinaryAndItsHelpers(t *testing.T) {
 	}
 }
 
+// TestBrowserValidationStopsTheHelpersOfABinaryThatExited proves a helper that the
+// stand-in left holding its output is killed once validation returns, rather than
+// surviving the binary that started it.
+func TestBrowserValidationStopsTheHelpersOfABinaryThatExited(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "helper.pid")
+	bin := writeExecutable(t, fmt.Sprintf(
+		"sleep 600 &\necho $! > '%s'\nprintf '%%s' '%s'\n",
+		pidFile,
+		headlessBlankPage,
+	))
+
+	ctx, cancel := context.WithTimeout(t.Context(), resolutionDeadline)
+	defer cancel()
+	helper := make(chan int, 1)
+	go func() { helper <- waitForLiveHelper(pidFile, resolutionDeadline) }()
+
+	started := time.Now()
+	_ = validateBrowser(ctx, bin)
+	elapsed := time.Since(started)
+
+	pid := <-helper
+	if pid == 0 {
+		t.Fatal("the stand-in's helper was never observed alive, so its cleanup cannot be judged")
+	}
+	t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
+	if limit := resolutionDeadline + browserExitTimeout; elapsed > limit {
+		t.Fatalf(
+			"validation with a lingering helper returned after %s, want at most %s",
+			elapsed,
+			limit,
+		)
+	}
+	gone := time.Now().Add(resolutionDeadline)
+	for processAlive(pid) {
+		if time.Now().After(gone) {
+			t.Fatalf("helper process %d outlived the validation of the binary that started it", pid)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// TestConfiguredBrowserIsValidatedOnceAndUsedAsGiven proves a browser selected with
+// -rod=bin=<path> is checked before its first launch, and only then.
+func TestConfiguredBrowserIsValidatedOnceAndUsedAsGiven(t *testing.T) {
+	runs := filepath.Join(t.TempDir(), "runs")
+	bin := writeExecutable(t, fmt.Sprintf(
+		"echo run >> '%s'\nprintf '%%s' '%s'\n",
+		runs,
+		headlessBlankPage,
+	))
+
+	for range 2 {
+		ctx, cancel := context.WithTimeout(t.Context(), resolutionDeadline)
+		got, err := browserBinary(ctx, bin)
+		cancel()
+		if err != nil || got != bin {
+			t.Fatalf("resolve a working configured browser: got %q, %v; want %q", got, err, bin)
+		}
+	}
+	raw, err := os.ReadFile(filepath.Clean(runs))
+	if err != nil {
+		t.Fatalf("the configured browser was never validated: %v", err)
+	}
+	if count := strings.Count(string(raw), "run"); count != 1 {
+		t.Fatalf("configured browser validated %d times, want once", count)
+	}
+}
+
+// TestConfiguredUnusableBrowserFailsPromptlyWithTheSelection proves an unusable
+// selected browser is reported, with the selection to change, before any launch.
+func TestConfiguredUnusableBrowserFailsPromptlyWithTheSelection(t *testing.T) {
+	bin := writeExecutable(t, "exec sleep 600\n")
+
+	ctx, cancel := context.WithTimeout(t.Context(), resolutionDeadline)
+	defer cancel()
+	started := time.Now()
+	_, err := browserBinary(ctx, bin)
+	elapsed := time.Since(started)
+
+	if !errors.Is(err, context.DeadlineExceeded) ||
+		!strings.Contains(err.Error(), bin) ||
+		!strings.Contains(err.Error(), configuredBrowserHint) {
+		t.Fatalf(
+			"stalled configured browser: error = %v, want the deadline, %q and %q",
+			err,
+			bin,
+			configuredBrowserHint,
+		)
+	}
+	if limit := resolutionDeadline + browserExitTimeout; elapsed > limit {
+		t.Fatalf("stalled configured browser returned after %s, want at most %s", elapsed, limit)
+	}
+}
+
 // TestManagedBrowserWithAStalledCachedBinaryFailsAtTheDeadline reproduces a cached Rod
 // browser that hangs while it is validated: resolution returns at the deadline with the
 // selection hint, and the cached binary is left in place.

@@ -18,26 +18,61 @@ import (
 // headlessBlankPage is what a usable headless browser prints for about:blank with --dump-dom.
 var headlessBlankPage = []byte(`<html><head></head><body></body></html>`)
 
-// managedBrowser caches the Rod-managed browser for the whole test binary, so it is
+// browserResolution caches one browser's resolution for the whole test binary, so it is
 // downloaded and validated once rather than before every launch.
-var managedBrowser struct {
+type browserResolution struct {
 	once sync.Once
 	bin  string
 	err  error
 }
 
-// browserBinary returns the executable a launch should start. A binary selected with
-// Rod's -rod=bin=<path> test flag is used as given. Otherwise the Rod-managed revision is
+// browserResolutions holds one resolution per configured path; the empty path is the
+// Rod-managed browser.
+var browserResolutions = struct {
+	sync.Mutex
+	byPath map[string]*browserResolution
+}{byPath: map[string]*browserResolution{}}
+
+// browserBinary returns the executable a launch should start: the binary selected with
+// Rod's -rod=bin=<path> test flag, or otherwise the Rod-managed revision. Each is
 // resolved once, within ctx, so a missing, stalled or unusable binary fails every
 // launch promptly with the same diagnostic instead of reaching the package timeout.
 func browserBinary(ctx context.Context, configured string) (string, error) {
-	if configured != "" {
-		return configured, nil
-	}
-	managedBrowser.once.Do(func() {
-		managedBrowser.bin, managedBrowser.err = resolveManagedBrowser(ctx, launcher.NewBrowser())
+	resolution := browserResolutionFor(configured)
+	resolution.once.Do(func() {
+		if configured == "" {
+			resolution.bin, resolution.err = resolveManagedBrowser(ctx, launcher.NewBrowser())
+			return
+		}
+		resolution.bin, resolution.err = resolveConfiguredBrowser(ctx, configured)
 	})
-	return managedBrowser.bin, managedBrowser.err
+	return resolution.bin, resolution.err
+}
+
+// browserResolutionFor returns the shared resolution for a configured path.
+func browserResolutionFor(configured string) *browserResolution {
+	browserResolutions.Lock()
+	defer browserResolutions.Unlock()
+	resolution, ok := browserResolutions.byPath[configured]
+	if !ok {
+		resolution = &browserResolution{}
+		browserResolutions.byPath[configured] = resolution
+	}
+	return resolution
+}
+
+// resolveConfiguredBrowser validates the browser selected with -rod=bin=<path> within
+// ctx and, when it works, launches it as given.
+func resolveConfiguredBrowser(ctx context.Context, bin string) (string, error) {
+	if err := validateBrowser(ctx, bin); err != nil {
+		return "", fmt.Errorf(
+			"validate the configured browser %s: %w; %s",
+			bin,
+			err,
+			configuredBrowserHint,
+		)
+	}
+	return bin, nil
 }
 
 // resolveManagedBrowser downloads the managed revision when it is absent and validates
@@ -78,15 +113,24 @@ func resolveManagedBrowser(ctx context.Context, managed *launcher.Browser) (stri
 
 const browserSelectionHint = "to use an installed browser, append -args -rod=bin=<path> to go test"
 
+const configuredBrowserHint = "name a working browser with -rod=bin=<path>, " +
+	"or drop the option to use the Rod-managed browser"
+
 // validateBrowser renders about:blank headlessly with the same arguments Rod uses. The
-// browser runs in its own process group, which is killed when ctx ends, and its output
-// pipes are released after browserExitTimeout so a helper process cannot hold the call.
+// browser runs in its own process group, which is killed when ctx ends and again once
+// the call returns, and its output pipes are released after browserExitTimeout, so a
+// helper process can neither hold the call nor outlive it.
 func validateBrowser(ctx context.Context, bin string) error {
 	cmd := exec.CommandContext(ctx, bin, "--headless", "--no-sandbox", "--use-mock-keychain",
 		"--disable-dev-shm-usage", "--disable-gpu", "--dump-dom", "about:blank")
 	ownProcessGroup(cmd)
 	cmd.WaitDelay = browserExitTimeout
 	output, err := cmd.CombinedOutput()
+	if cmd.Process != nil {
+		// The group outlives its leader while a helper is in it; once it is empty the
+		// kill reports that nothing is left, which is the expected outcome.
+		_ = cmd.Cancel()
+	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return fmt.Errorf("browser did not answer before the launch deadline: %w", ctxErr)
 	}
