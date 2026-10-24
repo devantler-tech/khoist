@@ -37,7 +37,7 @@ The minimum Go version is declared only in `go.mod`. The public roadmap is GitHu
 - `docs/adr/` — architectural decisions.
 - `main.go` — controller manager and registry process.
 
-`CLAUDE.md` and `GEMINI.md` each contain a Markdown heading and a single `@AGENTS.md` include.
+`CLAUDE.md` and `GEMINI.md` each contain the heading `# Agent instructions`, one blank line and a single `@AGENTS.md` include.
 Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enforces that exact shape in CI.
 
 ## Architecture boundaries
