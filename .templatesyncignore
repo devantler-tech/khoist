@@ -14,8 +14,8 @@
 # plumbing includes .github/workflows/{ci,cd,release,template-sync,todos}.yaml,
 # the shared lint configs (.mega-linter.yml, .pre-commit-config.yaml,
 # .editorconfig, .gitattributes — NOT .golangci.yml, which instances own; see
-# below), the mockery pre-commit hook scripts, and the
-# CLAUDE.md/GEMINI.md shims. (ci.yaml is deliberately template-owned for
+# below) and the mockery pre-commit hook scripts; this instance owns its
+# CLAUDE.md/GEMINI.md shims (see below). (ci.yaml is deliberately template-owned for
 # devantler-tech instances — they all share the same ruleset-injected
 # build/test workflows and this required-checks aggregation, so CI fixes must
 # propagate. An instance OUTSIDE devantler-tech does not inherit those org
@@ -29,6 +29,11 @@ README.md
 LICENSE
 .github/CODEOWNERS
 .claude/skills/maintain/SKILL.md
+# The shims carry a first-line heading for this repository's Markdown lint, so
+# the instance owns them and the check that enforces their exact shape.
+CLAUDE.md
+GEMINI.md
+scripts/validate-agent-shims.test.sh
 
 # --- Release / dependency / lint config the instance tailors ---
 # .golangci.yml is instance-owned on purpose: its depguard rule is a strict

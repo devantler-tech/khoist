@@ -135,6 +135,9 @@ jobs:
       - name: Validate Go toolchain pins
         run: sh scripts/toolchain.test.sh
 
+      - name: Validate agent instruction shims
+        run: sh scripts/validate-agent-shims.test.sh
+
       - name: Validate chart behavior
         run: sh scripts/chart.test.sh
 

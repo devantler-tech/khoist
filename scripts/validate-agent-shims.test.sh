@@ -2,19 +2,21 @@
 # validate-agent-shims.test.sh — keep tool-specific instruction shims canonical.
 #
 # AGENTS.md is the durable, cross-tool source of truth. Include-capable agents
-# receive it through one-line shims; copied prose would create a second source
-# that can silently drift. Run locally with:
+# receive it through shims that hold only a Markdown heading (which the
+# repository's Markdown lint requires as the first line) and one @AGENTS.md
+# include. Copied prose would create a second source that can silently drift.
+# Run locally with:
 #
 #   sh scripts/validate-agent-shims.test.sh
 #
-# CI runs the same assertion from validate-scaffold.yaml.
+# CI runs the same assertion in the core job of .github/workflows/ci.yaml.
 set -eu
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 expected="$(mktemp)"
 trap 'rm -f "$expected"' EXIT
 
-printf '@AGENTS.md\n' >"$expected"
+printf '# Agent instructions\n\n@AGENTS.md\n' >"$expected"
 
 failed=0
 
@@ -30,7 +32,7 @@ for shim in CLAUDE.md GEMINI.md; do
 		continue
 	fi
 	if ! cmp -s "$expected" "$path"; then
-		report_failure "$shim must contain exactly @AGENTS.md followed by one newline"
+		report_failure "$shim must contain exactly the heading '# Agent instructions', one blank line and @AGENTS.md, ending in one newline"
 	fi
 done
 
