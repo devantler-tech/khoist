@@ -97,16 +97,29 @@ fi
 # Write probe lines to a saved copy of the container log. With errtrace the ERR trap also fires
 # inside command substitutions and pipelines, whose stdout is the entrypoint's own data.
 exec 47>&1
-# The trap passes all values as arguments before any handler command overwrites PIPESTATUS.
-# Keep the original error marker and emit only numeric stages for multi-command pipelines.
-# Report original numeric pipeline statuses without echoing commands or private values.
+# Record one entrypoint failure without putting diagnostic text on its stdout.
+# Arguments: the original exit status, source line, then every captured pipeline
+# status. The ERR trap expands them before any helper command changes PIPESTATUS.
+# Writes numeric records to descriptor 47, including the full stage count and at
+# most 16 statuses. Emit the compatible legacy record only for complete vectors;
+# the outer wrapper marks an incomplete retained vector rather than trusting it.
 _khoist_probe_error() {
-	printf 'khoist-probe err status=%d line=%d\n' "$1" "$2" >&47
-	if (($# > 3)); then
-		local IFS=,
-		printf 'khoist-probe pipeline line=%d statuses=%s\n' "$2" "${*:3}" >&47
+	local status=$1 line=$2 stages=$(($# - 2)) stage retained=0 pipeline=
+	shift 2
+	for stage in "$@"; do
+		((retained < 16)) || break
+		pipeline+="${pipeline:+,}$stage"
+		retained=$((retained + 1))
+	done
+	printf 'khoist-probe err status=%d line=%d stages=%d pipeline=%s\n' \
+		"$status" "$line" "$stages" "$pipeline" >&47
+	# Preserve the established complete-vector record, never a truncated prefix.
+	if ((stages > 1 && stages <= 16)); then
+		printf 'khoist-probe pipeline line=%d statuses=%s\n' "$line" "$pipeline" >&47
 	fi
 }
+# Expand the status and the complete PIPESTATUS vector before entering the function:
+# even its first local assignment would otherwise replace the evidence with [0].
 trap '_khoist_probe_error "$?" "$LINENO" "${PIPESTATUS[@]}"' ERR
 trap 'printf "khoist-probe exit status=%d\n" "$?" >&47' EXIT
 set -o errtrace

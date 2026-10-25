@@ -76,7 +76,8 @@ done
 # The copy never restarts, so its log is exactly the one diagnostic start.
 available=true
 kube logs "$probe" -c mongod --tail=200 >"$work/log" 2>/dev/null || available=false
-grep -E '^khoist-probe (entry-sha256=[0-9a-f]{64}|entry=unreadable|err status=[0-9]{1,3} line=[0-9]{1,6}|pipeline line=[0-9]{1,6} statuses=[0-9]{1,3}(,[0-9]{1,3}){1,15}|version (mode=direct statuses=[0-9]{1,3}|mode=early statuses=[0-9]{1,3}(,[0-9]{1,3}){3}|mode=drain statuses=[0-9]{1,3},[0-9]{1,3})|version=unavailable|exit status=[0-9]{1,3})$' \
+status_pattern='([0-9]{1,2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+grep -E "^khoist-probe (entry-sha256=[0-9a-f]{64}|entry=unreadable|err status=$status_pattern line=[0-9]{1,6}( stages=[0-9]{1,3} pipeline=$status_pattern(,$status_pattern){0,15})?|pipeline line=[0-9]{1,6} statuses=$status_pattern(,$status_pattern){1,15}|version (mode=direct statuses=$status_pattern|mode=early statuses=$status_pattern(,$status_pattern){3}|mode=drain statuses=$status_pattern,$status_pattern)|version=unavailable|exit status=$status_pattern)$" \
 	"$work/log" >"$work/probe-lines" || true
 # JSON payloads are still untrusted log data. Admit one exact closed summary,
 # not arbitrary diagnostic fields, even when a candidate emits our marker.
@@ -121,7 +122,12 @@ jq -Rnc --arg state "$state" --argjson available "$available" --argjson other "$
      else "Indeterminate" end),
    entrySha256:([$lines[] | select(startswith("khoist-probe entry-sha256=")) | .[26:]] | first),
    errors:([$lines[] | select(startswith("khoist-probe err ")) |
-     capture("status=(?<status>[0-9]+) line=(?<line>[0-9]+)") | map_values(tonumber)] | .[-8:]),
+     capture("status=(?<status>[0-9]+) line=(?<line>[0-9]+)(?: stages=(?<stages>[0-9]+) pipeline=(?<pipeline>[0-9,]+))?") |
+     (.pipeline // "" | split(",") | map(tonumber)) as $pipeline |
+     {status:(.status|tonumber),line:(.line|tonumber)} +
+       (if .stages==null then {} else
+         {pipelineStages:(.stages|tonumber),pipelineStatuses:$pipeline,
+          pipelineComplete:((.stages|tonumber)==($pipeline|length))} end)] | .[-8:]),
    pipelines:([$lines[] | select(startswith("khoist-probe pipeline ")) |
      capture("line=(?<line>[0-9]+) statuses=(?<statuses>[0-9,]+)") |
      {line:(.line|tonumber),statuses:(.statuses|split(",")|map(tonumber))}] | .[-8:]),
