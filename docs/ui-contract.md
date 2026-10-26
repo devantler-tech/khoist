@@ -18,7 +18,7 @@ A legacy `spec.ui` or descriptor `ui` object may contain a public HTTPS URL, a t
 rewrite stored Kubernetes declarations solely to upgrade this runtime.
 
 - URLs follow the literal public HTTPS profile, with no credentials or fragments.
-- Titles contain 1–200 characters, and the standalone UI metadata limit is 16 KiB.
+- Titles are nonblank and contain at most 200 UTF-16 units; the standalone UI metadata limit is 16 KiB.
 - Contract versions are `data-product-ui/v1` and `data-product-ui/v2`.
 - Host origins are exact canonical HTTPS origins, with at most 16 distinct entries.
 - Capability names are bounded and unique. V1 accepts `status` and `resize`; v2 also accepts

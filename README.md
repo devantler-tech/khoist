@@ -210,7 +210,7 @@ The current foundation provides:
 - a default-off [publisher preflight command](docs/publisher-preflight.md) that validates local manifests and previews public descriptors before GitOps publication;
 - an API-only registry workspace that inspects public descriptors and exposes explicit standard interface links;
 - inert validation of bounded legacy UI metadata, with no product-session runtime;
-- an independently deployed harbour-observations example with its own OpenAPI contract, query API, and UI;
+- an independently deployed harbour-observations example with its own OpenAPI contract and query API;
 - a live [KSail release browser](docs/ksail-releases.md) with optional catalogue publication, its external public query contract and bounded, credential-free reads;
 - an opt-in, Secret-backed HTTPS JSON export connector with a read-only API, OpenAPI contract, probes, and metrics;
 - a Helm chart containing CRDs, least-privilege RBAC, hardened workloads, services, and optional Gateway API routing. Leader election uses release-local Leases and core Event create/patch permissions; it grants no cluster-wide Event access.
