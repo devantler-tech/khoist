@@ -12,7 +12,7 @@ import (
 
 func TestKSailReleaseSurfaceServesWithoutOptIn(t *testing.T) {
 	t.Parallel()
-	for _, path := range []string{"/ksail-releases/ui", "/ksail-releases/openapi.json", "/ksail-releases/ui-contract-config", "/ksail-releases/assets/product.js"} {
+	for _, path := range []string{"/ksail-releases/ui", "/ksail-releases/openapi.json", "/ksail-releases/assets/product.js"} {
 		response := httptest.NewRecorder()
 		demoproduct.NewHandler().
 			ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
@@ -76,7 +76,7 @@ func TestKSailReleaseSurfacePublishesFixedPublicSource(t *testing.T) {
 		document.Paths["/repos/devantler-tech/ksail/releases"] == nil {
 		t.Fatal("contract does not describe the actual external release endpoint")
 	}
-	for _, path := range []string{"/ksail-releases/ui", "/ksail-releases/openapi.json", "/ksail-releases/ui-contract-config"} {
+	for _, path := range []string{"/ksail-releases/ui", "/ksail-releases/openapi.json"} {
 		denied := httptest.NewRecorder()
 		handler.ServeHTTP(
 			denied,

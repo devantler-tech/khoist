@@ -10,8 +10,8 @@ import (
 	data "github.com/devantler-tech/data-product-controller/api/v1alpha1"
 )
 
-// TestV2RequiredGatesMatchHostAdmission keeps protocol requirements independent of optional hints.
-func TestV2RequiredGatesMatchHostAdmission(t *testing.T) {
+// TestLegacyUIMetadataRequiresNoRuntimeGates keeps bounded metadata inert after retirement.
+func TestLegacyUIMetadataRequiresNoRuntimeGates(t *testing.T) {
 	for _, version := range []string{"data-product-ui/v1", "data-product-ui/v2"} {
 		for _, caps := range [][]data.UICapability{{}, {"status"}, {"appearance"}} {
 			p := product("ui")
@@ -24,10 +24,7 @@ func TestV2RequiredGatesMatchHostAdmission(t *testing.T) {
 					Capabilities: caps,
 				},
 			}
-			want := []string{"ui-contract"}
-			if version == "data-product-ui/v2" {
-				want = []string{"ui-appearance", "ui-contract"}
-			}
+			want := []string{}
 			wire := bundle(t, p)
 			legacy := Check(t.Context(), strings.NewReader(wire), "")
 			current := CheckBundle(t.Context(), []io.Reader{strings.NewReader(wire)}, "")

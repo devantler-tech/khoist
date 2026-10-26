@@ -1,7 +1,6 @@
 package demoproduct
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/devantler-tech/data-product-controller/internal/uibundle"
@@ -11,7 +10,7 @@ const releaseSourceURL = "https://api.github.com/repos/devantler-tech/ksail/rele
 
 // registerReleaseSurface publishes an independent browser view of a fixed public source.
 // Only the consumer's browser reads GitHub; this process and the controller read no release data.
-func registerReleaseSurface(mux *http.ServeMux, options HandlerOptions) {
+func registerReleaseSurface(mux *http.ServeMux) {
 	bundle, err := uibundle.Load(
 		uiFiles,
 		"ui/releases.html",
@@ -31,10 +30,7 @@ func registerReleaseSurface(mux *http.ServeMux, options HandlerOptions) {
 			http.Error(w, "release interface unavailable", http.StatusInternalServerError)
 			return
 		}
-		connectSources := "'self' " + releaseSourceURL
-		if options.PublicBaseURL != "" {
-			connectSources = options.PublicBaseURL + "/ksail-releases/ui-contract-config " + releaseSourceURL
-		}
+		connectSources := releaseSourceURL
 		w.Header().
 			Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src "+connectSources+"; frame-ancestors https:; object-src 'none'; base-uri 'none'")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -47,18 +43,6 @@ func registerReleaseSurface(mux *http.ServeMux, options HandlerOptions) {
 	}
 	mux.HandleFunc("GET /ksail-releases/ui", serve)
 	mux.HandleFunc("GET /ksail-releases/assets/{asset}", serve)
-	mux.HandleFunc(
-		"GET /ksail-releases/ui-contract-config",
-		func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			_ = json.NewEncoder(w).Encode(struct {
-				HostOrigins       []string `json:"hostOrigins"`
-				AppearanceEnabled bool     `json:"appearanceEnabled"`
-			}{options.HostOrigins, options.AppearanceEnabled})
-		},
-	)
 	mux.HandleFunc(
 		"GET /ksail-releases/openapi.json",
 		func(w http.ResponseWriter, _ *http.Request) {

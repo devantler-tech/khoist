@@ -45,8 +45,8 @@ curl --fail http://127.0.0.1:8080/openapi.json
 ```
 
 The first response contains only Nordhavn. The second is the API contract.
-The product also has its own page at `http://127.0.0.1:8080/ui`; consumer applications
-can use the API directly.
+Consumer applications use this API and own their presentation. The example exposes
+no Harbour presentation page or product-session protocol.
 
 ## Check a product declaration
 

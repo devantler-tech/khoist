@@ -13,10 +13,9 @@ import (
 	"time"
 
 	"github.com/devantler-tech/data-product-controller/internal/config"
-	"github.com/devantler-tech/data-product-controller/internal/uibundle"
 )
 
-//go:embed ui/*
+//go:embed ui/releases.html ui/product.css ui/product.js
 var uiFiles embed.FS
 
 type observation struct {
@@ -41,24 +40,18 @@ var observations = []observation{
 	},
 }
 
-// HandlerOptions binds public endpoints and optional presentation to publisher-owned configuration.
-type HandlerOptions struct {
-	PublicBaseURL     string
-	HostOrigins       []string
-	AppearanceEnabled bool
+// HandlerOptions binds published endpoints to publisher-owned configuration.
+type HandlerOptions struct{ PublicBaseURL string }
+
+// NewHandler returns the sample API and independent release browser.
+func NewHandler() http.Handler { return newHandler(HandlerOptions{}) }
+
+// NewHandlerWithPublicURL validates an explicitly published public endpoint.
+func NewHandlerWithPublicURL(baseURL string) (http.Handler, error) {
+	return NewHandlerWithOptions(HandlerOptions{PublicBaseURL: baseURL})
 }
 
-// NewHandler returns the example product's API, contract, and decentralized UI.
-func NewHandler(hostOrigins ...string) http.Handler {
-	return newHandler(HandlerOptions{HostOrigins: hostOrigins})
-}
-
-// NewHandlerWithPublicURL restricts sandboxed reads to the sample's configured public endpoints.
-func NewHandlerWithPublicURL(baseURL string, hostOrigins ...string) (http.Handler, error) {
-	return NewHandlerWithOptions(HandlerOptions{PublicBaseURL: baseURL, HostOrigins: hostOrigins})
-}
-
-// NewHandlerWithOptions validates independent publication and default-off presentation settings.
+// NewHandlerWithOptions validates publication settings before serving.
 func NewHandlerWithOptions(options HandlerOptions) (http.Handler, error) {
 	baseURL := options.PublicBaseURL
 	if baseURL != "" {
@@ -79,66 +72,17 @@ func NewHandlerWithOptions(options HandlerOptions) (http.Handler, error) {
 			)
 		}
 	}
-	if options.AppearanceEnabled {
-		if _, err := config.UIHostOrigins(
-			strings.Join(options.HostOrigins, ","),
-		); err != nil ||
-			len(options.HostOrigins) == 0 {
-			return nil, fmt.Errorf("appearance requires publisher-approved HTTPS host origins")
-		}
-	}
 	return newHandler(options), nil
 }
 
 var publicPath = regexp.MustCompile(`^(/[A-Za-z0-9_-]+)*$`)
 
-// newHandler serves independently published data and its matching, credential-free UI bundle.
-func newHandler(options HandlerOptions) http.Handler {
-	bundle, bundleErr := uibundle.Load(
-		uiFiles,
-		"ui/index.html",
-		uibundle.Source{
-			FS:          uiFiles,
-			Path:        "ui/product.css",
-			ContentType: "text/css; charset=utf-8",
-		},
-		uibundle.Source{
-			FS:          uiFiles,
-			Path:        "ui/product.js",
-			ContentType: "text/javascript; charset=utf-8",
-		},
-	)
-	serveUI := func(response http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodGet {
-			response.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if bundleErr != nil {
-			http.Error(response, "product interface unavailable", http.StatusInternalServerError)
-			return
-		}
-		setUISecurityHeaders(response, options.PublicBaseURL)
-		if request.URL.Path == "/ui" {
-			bundle.ServeHTML(response)
-			return
-		}
-		bundle.ServeAsset(response, request, request.PathValue("asset"))
-	}
+// newHandler serves the public API and a separate consumer application.
+func newHandler(_ HandlerOptions) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /ui-contract-config", func(response http.ResponseWriter, _ *http.Request) {
-		response.Header().Set("Content-Type", "application/json")
-		response.Header().Set("Cache-Control", "no-store")
-		response.Header().Set("Access-Control-Allow-Origin", "*")
-		_ = json.NewEncoder(response).Encode(struct {
-			HostOrigins       []string `json:"hostOrigins"`
-			AppearanceEnabled bool     `json:"appearanceEnabled"`
-		}{HostOrigins: options.HostOrigins, AppearanceEnabled: options.AppearanceEnabled})
-	})
 	mux.HandleFunc("/api/observations", observationsHandler)
 	mux.HandleFunc("/openapi.json", openAPIHandler)
-	mux.HandleFunc("/ui", serveUI)
-	mux.HandleFunc("/assets/{asset}", serveUI)
-	registerReleaseSurface(mux, options)
+	registerReleaseSurface(mux)
 	mux.HandleFunc("/healthz", func(response http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodGet {
 			response.WriteHeader(http.StatusMethodNotAllowed)
@@ -158,10 +102,7 @@ func observationsHandler(response http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	// The registry deliberately gives embedded product UIs an opaque origin by
-	// omitting allow-same-origin from the iframe sandbox. This output is public
-	// and credential-free, so allow that UI (and other catalogues) to read it
-	// without granting cookies or authorization headers.
+	// This public API permits credential-free reads without sharing cookies or credentials.
 	response.Header().Set("Access-Control-Allow-Origin", "*")
 
 	station := strings.ToLower(strings.TrimSpace(request.URL.Query().Get("station")))
@@ -190,20 +131,6 @@ func openAPIHandler(response http.ResponseWriter, request *http.Request) {
 
 	response.Header().Set("Content-Type", "application/json")
 	_, _ = response.Write([]byte(openAPIDocument))
-}
-
-// setUISecurityHeaders permits the independent sample to be embedded without granting origin access.
-func setUISecurityHeaders(response http.ResponseWriter, baseURL string) {
-	connectSources := "'self'"
-	if baseURL != "" {
-		connectSources = baseURL + "/api/observations " + baseURL + "/ui-contract-config"
-	}
-	response.Header().Set(
-		"Content-Security-Policy",
-		"default-src 'self'; script-src 'self'; style-src 'self'; connect-src "+connectSources+"; frame-ancestors https:; object-src 'none'; base-uri 'none'",
-	)
-	response.Header().Set("Referrer-Policy", "no-referrer")
-	response.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
 const openAPIDocument = `{"openapi":"3.1.0","info":{"title":"Harbour observations","version":"1.0.0"},"paths":{"/api/observations":{"get":{"summary":"Query harbour observations","parameters":[{"name":"station","in":"query","schema":{"type":"string"}}],"responses":{"200":{"description":"Matching observations","content":{"application/json":{"schema":{"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{"type":"object","required":["station","temperatureCelsius","salinityPsu","observedAt"],"properties":{"station":{"type":"string"},"temperatureCelsius":{"type":"number"},"salinityPsu":{"type":"number"},"observedAt":{"type":"string","format":"date-time"}}}}}}}}}}}}}}`

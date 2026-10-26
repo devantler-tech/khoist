@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Sourced by the real-cluster integration test after the generated CRD is installed.
+# Verify installed runtime absence while retaining strict legacy metadata admission.
 : "${repo_root:?run through tests/source/run.sh}"
 : "${test_dir:?integration scratch directory is required}"
+
+kube get deployment dpc -o json | jq -e 'all(.spec.template.spec.containers[]; all((.env // [])[]; (.name != "UI_CONTRACT_ENABLED" and .name != "UI_APPEARANCE_ENABLED" and .name != "UI_HOST_ORIGINS")))' >/dev/null
+probe --url http://dpc/assets/ui-contract.js --want-status 404
+probe --url http://dpc/api/v1/ui-config --contains '"uiContractEnabled":false,"uiAppearanceEnabled":false'
+echo 'PASS: installed controller exposes no presentation runtime or operator grants'
 
 yq -o=json '.' "$repo_root/docs/examples/http-source-product.yaml" |
 	jq '.metadata.name="ui-admission-fixture" | .spec.ui={url:"https://product.example/ui",title:"Synthetic interface",

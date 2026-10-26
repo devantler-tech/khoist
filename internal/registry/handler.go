@@ -63,11 +63,6 @@ func NewHandlerWithOptions(reader client.Reader, options HandlerOptions) http.Ha
 			ContentType: "text/javascript; charset=utf-8",
 		},
 		uibundle.Source{
-			FS:          web.CompatibilityAssets,
-			Path:        "ui-contract.js",
-			ContentType: "text/javascript; charset=utf-8",
-		},
-		uibundle.Source{
 			FS:          web.Assets,
 			Path:        "descriptor.js",
 			ContentType: "text/javascript; charset=utf-8",

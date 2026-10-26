@@ -194,12 +194,10 @@ downloads, inventory cursor and pending reads. Restoring a persisted browser-his
 entry re-reads host configuration, the catalog and the selected product before
 displaying new observations. It never opens a product interface automatically.
 The browser requests 16 products per page, leaving room for the maximum-size descriptors
-and page envelope inside the response bound. Local descriptor files also use strict UTF-8
-decoding; malformed bytes reject the import and withdraw any earlier UI session.
-Metadata validation permits valid unhealthy products and products without a UI to be
-inspected. Only the deprecated independent compatibility kit mounts a declared UI;
-importing a descriptor requires its recorded aggregate readiness as well as publisher
-host approval and presentation grants. Offline readiness is an observation, not a
+and page envelope inside the response bound. Metadata validation permits valid unhealthy
+products and products without a UI to be inspected. The independent publisher application
+inspects bounded descriptors without a presentation runtime, product frames or session grants.
+Offline readiness is an observation, not a
 fresh controller read. Search includes canonical name, namespace/name,
 public product ID, display name, owner, description and namespace among loaded products.
 

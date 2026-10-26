@@ -12,6 +12,7 @@ import (
 	datav1alpha1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
 	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
 	"github.com/devantler-tech/data-product-controller/internal/registry"
+	"github.com/go-rod/rod"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -29,26 +30,27 @@ func TestUIUpgrade(t *testing.T) {
 		scripts           []string
 		handler           http.Handler
 	}{
-		{"registry", "/", "registry.css", []string{"registry.js", "metadata.js", "descriptor.js", "lineage.js", "ui-contract.js"}, registry.NewHandler(reader)},
-		{"sample", "/ui", "product.css", []string{"product.js"}, demoproduct.NewHandler()},
+		{"registry", "/", "registry.css", []string{"registry.js", "metadata.js", "descriptor.js", "lineage.js"}, registry.NewHandler(reader)},
+		{"releases", "/ksail-releases/ui", "product.css", []string{"product.js"}, demoproduct.NewHandler()},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var upgraded atomic.Bool
-			legacy := `<h1>Previous release</h1><link rel="stylesheet" href="/assets/` + test.style + `">`
+			prefix := strings.TrimSuffix(test.path, "ui") + "assets/"
+			legacy := `<h1>Previous release</h1><link rel="stylesheet" href="` + prefix + test.style + `">`
 			for _, script := range test.scripts {
-				legacy += `<script src="/assets/` + script + `"></script>`
+				legacy += `<script src="` + prefix + script + `"></script>`
 			}
 			server := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					// The old shared URLs remain stale even after the origin upgrades, as a CDN may retain them.
-					if r.URL.Path == "/assets/"+test.style {
+					if r.URL.Path == prefix+test.style {
 						w.Header().Set("Content-Type", "text/css")
 						w.Header().Set("Cache-Control", "public, max-age=14400")
 						_, _ = w.Write([]byte(`main { min-width: 2000px; }`))
 						return
 					}
 					for _, script := range test.scripts {
-						if r.URL.Path == "/assets/"+script {
+						if r.URL.Path == prefix+script {
 							w.Header().Set("Content-Type", "text/javascript")
 							w.Header().Set("Cache-Control", "public, max-age=14400")
 							_, _ = w.Write(
@@ -66,9 +68,17 @@ func TestUIUpgrade(t *testing.T) {
 				}),
 			)
 			t.Cleanup(server.Close)
-			page := contractBrowser(
-				t,
-			).MustPage().
+			browser := contractBrowser(t)
+			if test.name == "releases" {
+				router := browser.HijackRequests()
+				router.MustAdd(releaseEndpoint, func(h *rod.Hijack) {
+					h.Response.SetHeader("Content-Type", "application/json", "Access-Control-Allow-Origin", "*").
+						SetBody(releaseFixture)
+				})
+				go router.Run()
+				t.Cleanup(func() { _ = router.Stop() })
+			}
+			page := browser.MustPage().
 				MustNavigate(server.URL + test.path).
 				MustWaitLoad()
 			if !page.MustEval(`() => document.documentElement.dataset.legacyAsset === "cached"`).
@@ -89,9 +99,9 @@ func TestUIUpgrade(t *testing.T) {
 				page.MustElement("#registry-status").
 					MustWait(`() => this.textContent.includes('No products match')`)
 			} else {
-				page.MustElement("#status").MustWait(`() => this.textContent === '2 observations'`)
-				if !strings.Contains(page.MustElement("table").MustText(), "Observed at") {
-					t.Fatal("upgraded sample did not render its current observation table")
+				page.MustElement("#status").MustWait(`() => this.textContent === '2 of 2 releases'`)
+				if !strings.Contains(page.MustElement("table").MustText(), "Published") {
+					t.Fatal("upgraded release consumer did not render its current release table")
 				}
 			}
 			page.MustSetViewport(375, 812, 1, false)

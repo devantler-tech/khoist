@@ -9,7 +9,7 @@ import (
 
 // TestDescriptorUniqueNamedCollections covers host import before a published surface can be selected.
 func TestDescriptorUniqueNamedCollections(t *testing.T) {
-	page, host, publisher, calls := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, calls := metadataInspectionFixture(t)
 	for _, collection := range []string{"outputs", "inputs", "lineage"} {
 		for _, duplicate := range []bool{false, true} {
 			t.Run(
@@ -47,14 +47,7 @@ func TestDescriptorUniqueNamedCollections(t *testing.T) {
 						delete(descriptor, "lineage")
 					}
 					before := calls.Load()
-					page.MustElement("#descriptor").
-						MustSelectAllText().
-						MustInput(descriptorJSON(t, descriptor))
-					page.MustElement("#import-descriptor").MustClick()
-					page.MustElement("#kit-status").
-						MustWait(`()=>['ready','invalid'].includes(this.dataset.state)`)
-					accepted := page.MustEval(`()=>document.querySelector('#kit-status').dataset.state==='ready'`).
-						Bool()
+					accepted := inspectDescriptor(t, page, descriptorJSON(t, descriptor))
 					if accepted == duplicate {
 						t.Fatalf(
 							"collection=%s duplicate=%t admitted=%t",
@@ -73,7 +66,7 @@ func TestDescriptorUniqueNamedCollections(t *testing.T) {
 }
 
 func TestDescriptorDependencyIdentityAdmission(t *testing.T) {
-	page, host, publisher, calls := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, calls := metadataInspectionFixture(t)
 	for _, tc := range []struct {
 		name, declaredNS, observedNS, producer, output, observedOutput string
 		valid                                                          bool
@@ -119,14 +112,7 @@ func TestDescriptorDependencyIdentityAdmission(t *testing.T) {
 				"observedGeneration": 2, "output": observedPort,
 			}}
 			before := calls.Load()
-			page.MustElement("#descriptor").
-				MustSelectAllText().
-				MustInput(descriptorJSON(t, descriptor))
-			page.MustElement("#import-descriptor").MustClick()
-			page.MustElement("#kit-status").
-				MustWait(`()=>['ready','invalid'].includes(this.dataset.state)`)
-			accepted := page.MustEval(`()=>document.querySelector('#kit-status').dataset.state==='ready'`).
-				Bool()
+			accepted := inspectDescriptor(t, page, descriptorJSON(t, descriptor))
 			if accepted != tc.valid {
 				t.Fatalf("dependency snapshot admitted=%t want=%t", accepted, tc.valid)
 			}
@@ -138,7 +124,7 @@ func TestDescriptorDependencyIdentityAdmission(t *testing.T) {
 }
 
 func TestDescriptorLineageReadinessAdmission(t *testing.T) {
-	page, host, publisher, calls := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, calls := metadataInspectionFixture(t)
 	for _, tc := range []struct {
 		ready  bool
 		reason string
@@ -164,14 +150,7 @@ func TestDescriptorLineageReadinessAdmission(t *testing.T) {
 					},
 				}
 				before := calls.Load()
-				page.MustElement("#descriptor").
-					MustSelectAllText().
-					MustInput(descriptorJSON(t, descriptor))
-				page.MustElement("#import-descriptor").MustClick()
-				page.MustElement("#kit-status").
-					MustWait(`()=>['ready','invalid'].includes(this.dataset.state)`)
-				accepted := page.MustEval(`()=>document.querySelector('#kit-status').dataset.state==='ready'`).
-					Bool()
+				accepted := inspectDescriptor(t, page, descriptorJSON(t, descriptor))
 				if accepted != tc.valid {
 					t.Fatalf("readiness admission=%t want=%t", accepted, tc.valid)
 				}
@@ -184,7 +163,7 @@ func TestDescriptorLineageReadinessAdmission(t *testing.T) {
 }
 
 func TestDescriptorUnicodeAdmission(t *testing.T) {
-	page, host, publisher, calls := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, calls := metadataInspectionFixture(t)
 	for _, tc := range []struct {
 		wire  string
 		valid bool
@@ -206,12 +185,7 @@ func TestDescriptorUnicodeAdmission(t *testing.T) {
 				t.Fatal("Unicode import fixture was not substituted")
 			}
 			before := calls.Load()
-			page.MustElement("#descriptor").MustSelectAllText().MustInput(changed)
-			page.MustElement("#import-descriptor").MustClick()
-			page.MustElement("#kit-status").
-				MustWait(`()=>['ready','invalid'].includes(this.dataset.state)`)
-			accepted := page.MustEval(`()=>document.querySelector('#kit-status').dataset.state==='ready'`).
-				Bool()
+			accepted := inspectDescriptor(t, page, changed)
 			if accepted != tc.valid {
 				t.Fatalf("Unicode descriptor admitted=%t want=%t", accepted, tc.valid)
 			}

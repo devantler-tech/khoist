@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	datav1alpha1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
 	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
@@ -127,98 +126,6 @@ func TestRegistryRetry(t *testing.T) {
 	page.MustElement(".product-card").MustWaitVisible()
 	if page.MustElement("#product-count").MustText() != "1 product" {
 		t.Fatal("retry did not restore the inventory")
-	}
-}
-
-// TestHarbourTable includes observation time and keeps the current station result after an older request finishes.
-func TestHarbourTable(t *testing.T) {
-	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	handler := demoproduct.NewHandler()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("station") == "nordhavn" {
-			close(started)
-			<-release
-			defer close(finished)
-		}
-		handler.ServeHTTP(w, r)
-	}))
-	t.Cleanup(server.Close)
-	var released bool
-	t.Cleanup(func() {
-		if !released {
-			close(release)
-		}
-	})
-	page := contractBrowser(t).MustPage().MustNavigate(server.URL + "/ui").MustWaitLoad()
-	page.MustElement(`nav[aria-label="Data access"]`).MustWaitVisible()
-	page.MustElement("#status").MustWait(`() => this.textContent === '2 observations'`)
-	if !page.MustEval(`async () => {
-		const link = [...document.querySelectorAll('a')].find(a => a.textContent === 'Open JSON data');
-		const response = await fetch(link.href);
-		return response.ok && (await response.json()).items.length === 2;
-	}`).Bool() {
-		t.Fatal("direct JSON data link does not reach the observation API")
-	}
-	if !page.MustEval(`() => !!document.querySelector('#observations table')`).Bool() {
-		t.Fatal("Harbour observations are not a comparison table")
-	}
-	if text := page.MustElement("#observations").
-		MustText(); !strings.Contains(text, "2026-08-29") ||
-		!strings.Contains(text, "16.8") {
-		t.Fatalf("table omits timestamp or value: %s", text)
-	}
-	page.MustElement("#station").MustSelect("Nordhavn")
-	page.MustElement("button[type=submit]").MustClick()
-	select {
-	case <-started:
-	case <-time.After(5 * time.Second):
-		t.Fatal("Nordhavn request did not start")
-	}
-	page.MustElement("#station").MustSelect("Refshaleoen")
-	page.MustElement("button[type=submit]").MustClick()
-	page.MustElement("#status").MustWait(`() => this.textContent === '1 observation'`)
-	close(release)
-	released = true
-	<-finished
-	// A same-origin fence confirms the delayed response is complete before the next UI assertion.
-	page.MustEval(
-		`async () => { await fetch('healthz'); await new Promise(requestAnimationFrame); }`,
-	)
-	if got := page.MustElement("#observations tbody").
-		MustText(); !strings.Contains(got, "Refshaleoen") ||
-		strings.Contains(got, "Nordhavn") {
-		t.Fatalf("older query overwrote the chosen station: %s", got)
-	}
-	page.MustSetViewport(375, 812, 1, false)
-	if page.MustEval(`() => document.documentElement.scrollWidth > innerWidth || document.querySelector('caption').getBoundingClientRect().width < 300`).
-		Bool() {
-		t.Fatal("mobile results overflow or collapse their caption")
-	}
-}
-
-// TestHarbourRecovery reports a data-plane failure, then restores real results after a retry.
-func TestHarbourRecovery(t *testing.T) {
-	var unavailable atomic.Bool
-	unavailable.Store(true)
-	handler := demoproduct.NewHandler()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/observations" && unavailable.Load() {
-			http.Error(w, "unavailable", http.StatusServiceUnavailable)
-			return
-		}
-		handler.ServeHTTP(w, r)
-	}))
-	t.Cleanup(server.Close)
-	page := contractBrowser(t).MustPage().MustNavigate(server.URL + "/ui").MustWaitLoad()
-	page.MustElement("#status").MustWait(`() => this.textContent.includes('503')`)
-	if !strings.Contains(page.MustElement("#status").MustText(), "retry") {
-		t.Fatal("failed query provides no recovery action")
-	}
-	unavailable.Store(false)
-	page.MustElement("button[type=submit]").MustClick()
-	page.MustElement("#status").MustWait(`() => this.textContent === '2 observations'`)
-	if got := len(page.MustElements("#observations tbody tr")); got != 2 {
-		t.Fatalf("recovered rows = %d, want 2", got)
 	}
 }
 

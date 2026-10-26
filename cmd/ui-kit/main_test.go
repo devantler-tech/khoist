@@ -62,17 +62,9 @@ func TestUIKitTransportAndReleaseGate(t *testing.T) {
 				if status != http.StatusOK || body != "" || headers.Get("Content-Length") != "3" {
 					t.Fatal("HEAD health exposed a body or lost its bounded response headers")
 				}
-				status, body, headers = hostRequest(t, client, http.MethodGet, base+"/", "")
-				if enabled != "true" {
-					if status != http.StatusNotFound || strings.Contains(body, "DataProductUI") {
-						t.Fatal("disabled host exposed compatibility assets")
-					}
-				} else if status != http.StatusOK || !strings.Contains(body, "ui-contract.js") ||
-					!strings.Contains(
-						headers.Get("Content-Security-Policy"),
-						"connect-src 'none'",
-					) {
-					t.Fatal("enabled host lost its embedded assets or no-connection policy")
+				status, body, _ = hostRequest(t, client, http.MethodGet, base+"/", "")
+				if status != http.StatusNotFound || strings.Contains(body, "DataProductUI") {
+					t.Fatal("retired compatibility host exposed product-session assets")
 				}
 				status, _, _ = hostRequest(t, client, http.MethodPost, base+"/healthz", "")
 				if status != http.StatusMethodNotAllowed {
@@ -112,24 +104,6 @@ func TestUIKitHelpPreservesDiscoverableOptions(t *testing.T) {
 	if err != nil || !strings.Contains(string(output), "http-behind-gateway") ||
 		!strings.Contains(string(output), "tls-cert") {
 		t.Fatalf("help did not describe the transport options: err=%v output=%s", err, output)
-	}
-}
-
-// TestUIKitDescriptorGate catches an enabled command dropping the offline handoff release flag.
-func TestUIKitDescriptorGate(t *testing.T) {
-	for _, value := range []string{"", "false", "true"} {
-		t.Run(value, func(t *testing.T) {
-			t.Setenv("REGISTRY_DISCOVERY_ENABLED", value)
-			address := availableAddress(t)
-			startHost(t, []string{"--http-behind-gateway", "--listen-address=" + address}, "true")
-			client := &http.Client{Timeout: time.Second}
-			waitForHost(t, client, "http://"+address+"/healthz")
-			status, body, _ := hostRequest(t, client, http.MethodGet, "http://"+address+"/", "")
-			if status != http.StatusOK ||
-				strings.Contains(body, `data-discovery-enabled="true"`) != (value == "true") {
-				t.Fatal("command did not publish its explicit offline descriptor release state")
-			}
-		})
 	}
 }
 
@@ -205,28 +179,6 @@ func TestUIKitRejectsInvalidPublisherFlag(t *testing.T) {
 	}
 }
 
-// TestUIKitRejectsInvalidDescriptorFlag catches accepting a typo as an activated or ignored release flag.
-func TestUIKitRejectsInvalidDescriptorFlag(t *testing.T) {
-	t.Setenv("REGISTRY_DISCOVERY_ENABLED", "invalid")
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
-	defer cancel()
-	command := hostCommand(
-		t,
-		ctx,
-		[]string{"--http-behind-gateway", "--listen-address=" + availableAddress(t)},
-		"true",
-	)
-	output, err := command.CombinedOutput()
-	if err == nil || ctx.Err() != nil ||
-		!strings.Contains(string(output), "REGISTRY_DISCOVERY_ENABLED") {
-		t.Fatalf(
-			"invalid descriptor flag did not fail before serving: err=%v output=%s",
-			err,
-			output,
-		)
-	}
-}
-
 // TestUIKitRejectsAmbiguousTransport catches implicit wildcard binding and mixed TLS/plaintext options.
 func TestUIKitRejectsAmbiguousTransport(t *testing.T) {
 	for _, tc := range []struct {
@@ -275,10 +227,11 @@ func hostCommand(t *testing.T, ctx context.Context, args []string, enabled strin
 	return command
 }
 
-func startHost(t *testing.T, args []string, enabled string) {
+func startHost(t *testing.T, args []string, enabled string, environment ...string) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	command := hostCommand(t, ctx, args, enabled)
+	command.Env = append(command.Env, environment...)
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
 	if err := command.Start(); err != nil {

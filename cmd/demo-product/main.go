@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,10 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/devantler-tech/data-product-controller/internal/config"
 	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
 	"github.com/devantler-tech/data-product-controller/internal/httpserver"
-	"github.com/devantler-tech/data-product-controller/pkg/featureflag"
 )
 
 func main() {
@@ -24,43 +21,12 @@ func main() {
 	}
 }
 
-// run validates publication settings before starting the sample's independent API and UI.
+// run validates publication settings before starting the sample API and independent release browser.
 func run() error {
 	address := flag.String("listen-address", ":8080", "Address for the example data product.")
 	flag.Parse()
-	enabled, err := config.UIContractEnabled(os.Getenv("UI_CONTRACT_ENABLED"))
-	if err != nil {
-		return err
-	}
-	appearanceEnabled, err := config.UIAppearanceEnabled(os.Getenv("UI_APPEARANCE_ENABLED"))
-	if err != nil {
-		return err
-	}
-	flagClient, err := featureflag.NewClient(
-		"demo-product",
-		featureflag.NewProvider(
-			map[string]bool{
-				"ui-contract":   enabled,
-				"ui-appearance": appearanceEnabled,
-			},
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("configure UI flag: %w", err)
-	}
-	var origins []string
-	if featureflag.Enabled(context.Background(), flagClient, "ui-contract") {
-		origins, err = config.UIHostOrigins(os.Getenv("UI_HOST_ORIGINS"))
-		if err != nil {
-			return err
-		}
-	}
-
 	handler, err := demoproduct.NewHandlerWithOptions(demoproduct.HandlerOptions{
 		PublicBaseURL: os.Getenv("PUBLIC_BASE_URL"),
-		HostOrigins:   origins,
-		AppearanceEnabled: featureflag.Enabled(context.Background(), flagClient, "ui-contract") &&
-			featureflag.Enabled(context.Background(), flagClient, "ui-appearance"),
 	})
 	if err != nil {
 		return err
