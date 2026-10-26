@@ -5,8 +5,8 @@
 KHoist (`devantler-tech/khoist`) is the cloud-native control plane for portable, composable data
 products. Its API describes ownership, standard query interfaces and dependencies between products. Consumers own their
 UIs. The controller observes metadata; it never stores product data or credentials. API-only integration is the accepted
-direction in `docs/adr/0023-api-only-product-integration.md`; retained legacy UI metadata/runtime is deprecated
-compatibility pending versioned migration.
+direction in `docs/adr/0023-api-only-product-integration.md`. Legacy UI metadata and the old publisher
+entrypoint remain deprecated compatibility pending versioned migration; product-session runtime is removed.
 
 The minimum Go version is declared only in `go.mod`. The public roadmap is GitHub issue [#1](https://github.com/devantler-tech/khoist/issues/1).
 
@@ -130,7 +130,7 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   never remain in public reports. Keep the report schema offline and the example reader independent.
   Explicit `--profile api-only` rejects legacy UI declarations before collecting requirements or
   emitting previews. Preserve the default compatibility profile and both existing report formats;
-  this offline policy does not change Kubernetes admission or retire the compatibility runtime.
+  this offline policy does not change Kubernetes admission.
 
 ## Validation
 
@@ -210,7 +210,7 @@ cmp config/crd/bases/data.devantler.tech_dataproducts.yaml deploy/data.devantler
 - Follow test-driven development for behavior: prove RED, make the smallest implementation GREEN, then refactor.
 - Keep new release behavior behind an OpenFeature flag, default-off, with both states tested. Remove short-lived flags after rollout; long-lived operational gates need an explicit rationale.
 - Treat product descriptors, contract documents and retained legacy product UIs as untrusted input.
-- Preserve HTTPS-only public interface validation, the registry's no-frame policy and the independent legacy kit's sandbox while it exists.
+- Preserve HTTPS-only public interface validation, the registry's no-frame policy and the independent publisher hosts' offline/no-frame boundaries.
 - Prefer Kubernetes conditions with actionable reasons and stable messages. Avoid status-only reconciliation loops.
 - Generated files carry generated provenance and are never edited manually.
 - ADRs live in `docs/adr/`. Documentation states present behavior, constraints, and rationale.
