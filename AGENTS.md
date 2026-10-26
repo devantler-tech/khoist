@@ -29,7 +29,7 @@ The minimum Go version is declared only in `go.mod`. The public roadmap is GitHu
 - `internal/demoproduct/` and `cmd/demo-product/` — independent harbour reference and standard live KSail release interfaces, with default-off optional catalogue publication.
 - `internal/httpsource/` and `cmd/http-source/` — default-off, Secret-configured read-only HTTPS JSON export connector with separate query and management listeners.
 - `internal/contractprobe/` and `cmd/contract-probe/` — independent credential-free HTTPS contract reachability with bounded requests and management-only endpoints.
-- `pkg/featureflag/` — OpenFeature boundary; provisioned sources, connector readiness, contract readiness, composition, DCAT publication, and portable UI grants are default-off. The registry workspace is always available.
+- `pkg/featureflag/` — OpenFeature boundary; provisioned sources, connector readiness, contract readiness, composition and DCAT publication are default-off. The registry workspace is always available.
 - `config/crd/bases/` and `config/rbac/` — generated Kubernetes manifests.
 - `charts/data-product-controller/` — installable controller, CRD, routing, and demo product.
 - `deploy/` — signed controller manifest artifact published with each release.
@@ -83,14 +83,13 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   fixed KSail GitHub API without credentials.
   Preserve the ten-second, 1-MiB streamed UTF-8 and 30-record bounds, plain-text projection,
   redirect rejection, local-only filters, refresh/navigation cancellation and public-source CSP.
-  The controller and workload never read release data, and only presentation hints reach the host.
+  The controller and workload never read release data, and no presentation messages reach a parent.
   Workload readiness does not establish GitHub availability. See `docs/ksail-releases.md`.
-- Legacy UI metadata remains bounded and validated until its versioned retirement. The registry's presentation
-  configuration keys are always false, regardless of legacy flags. The deprecated independent kit retains v1/v2 status,
-  resize and appearance controls: preserve its opaque origins, exact source/session/shape checks, publisher host
-  approval, grant intersection, revocation, message bounds and timeout cleanup while that runtime exists. Preserve the
-  separate useful publisher-review application. See `docs/ui-contract.md` and
-  `docs/adr/0023-api-only-product-integration.md`.
+- Legacy UI metadata remains bounded and validated until its versioned retirement. The registry's
+  presentation configuration keys remain false. No runtime evaluates `ui-contract` or `ui-appearance`;
+  product-session assets, grants and messaging are absent. Preserve the independent publisher-review
+  application, inert metadata validators and old `/ui-kit` publisher entrypoint until consuming
+  deployments switch. See `docs/ui-contract.md` and ADR 0023.
 - The JSON registry is a convenience projection of Kubernetes resources, not a second source of truth.
 - Discovery browser clients validate the closed public descriptor before display or export.
   Keep bounded streamed UTF-8 parsing and navigation cancellation; metadata inspection must allow
@@ -105,7 +104,7 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   bounded public UTF-8/URL metadata, consistent failed reads, acyclic resolved paths,
   feasible depths and declared version verdicts. Page exit withdraws all registry
   sessions and snapshots; persisted history restoration performs fresh reads. The
-  compatibility kit also revokes on declaration edits and grant changes. See
+  metadata inspection grants no execution. See
   `docs/dependency-traces.md` and `docs/ui-contract.md`.
 - DCAT publication requires the explicit `data.devantler.tech/dcat-type: Dataset` annotation and
   the default-off `dcat-catalog` gate. It projects public metadata only; a listing grants no access

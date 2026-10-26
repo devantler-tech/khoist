@@ -174,9 +174,8 @@ product identities in a stable order with producers before consumers, plus every
 named input/output edge. Several inputs may select one producer. This is a static
 review aid: it runs nothing, establishes no access or readiness, and prescribes no
 Kubernetes apply order. Per-product requirements describe products that passed
-publication validation; their sorted union is `requiredFeatures`. Every
-`data-product-ui/v2` declaration requires both `ui-contract` and
-`ui-appearance`, including interfaces that request no appearance hints.
+publication validation; their sorted union is `requiredFeatures`. Bounded legacy UI
+metadata requires no presentation gates because the product-session runtime is absent.
 
 The [v2 report schema](../internal/preflight/schema/report-v2.json) references the
 [public descriptor schema](../internal/registry/schema/descriptor-v1.json). Register
@@ -185,8 +184,9 @@ both documents locally and refuse unresolved schema references. The
 library. It checks its bounded report/preview profile, diagnostic counts, feature
 union, source membership and dependency plan. It rejects duplicate keys, unknown
 fields, unsupported versions, null required values, malformed Unicode escapes and trailing data.
-Both readers require the plan origin's feature list to include requirements visible in its preview:
-composition for inputs, ui-contract for a UI contract and ui-appearance for v2.
+Both readers require the plan origin's feature list to include composition for declared inputs.
+Historical `ui-contract` and `ui-appearance` identifiers remain readable in saved reports as inert
+data; newly emitted reports do not advertise them as requirements.
 Additional requirements from omitted private declarations remain permitted. It displays
 the report's claimed declaration result rather than revalidating the original bundle.
 It is not a generic JSON Schema or Kubernetes admission validator. The published

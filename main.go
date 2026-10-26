@@ -34,8 +34,6 @@ const compositionFlag = "composition"
 
 const (
 	dcatCatalogFlag       = "dcat-catalog"
-	uiContractFlag        = "ui-contract"
-	uiAppearanceFlag      = "ui-appearance"
 	registryDiscoveryFlag = "registry-discovery"
 	registryLineageFlag   = "registry-lineage"
 )
@@ -119,16 +117,6 @@ func main() {
 		setupLog.Error(err, "invalid DCAT catalog configuration")
 		os.Exit(1)
 	}
-	uiContractEnabled, err := config.UIContractEnabled(os.Getenv("UI_CONTRACT_ENABLED"))
-	if err != nil {
-		setupLog.Error(err, "invalid UI contract configuration")
-		os.Exit(1)
-	}
-	uiAppearanceEnabled, err := config.UIAppearanceEnabled(os.Getenv("UI_APPEARANCE_ENABLED"))
-	if err != nil {
-		setupLog.Error(err, "invalid UI appearance configuration")
-		os.Exit(1)
-	}
 	registryDiscoveryEnabled, err := config.RegistryDiscoveryEnabled(
 		os.Getenv("REGISTRY_DISCOVERY_ENABLED"),
 	)
@@ -151,8 +139,6 @@ func main() {
 			contractReadinessFlag:  contractsEnabled,
 			compositionFlag:        compositionEnabled,
 			dcatCatalogFlag:        dcatCatalogEnabled,
-			uiContractFlag:         uiContractEnabled,
-			uiAppearanceFlag:       uiAppearanceEnabled,
 			registryDiscoveryFlag:  registryDiscoveryEnabled,
 			registryLineageFlag:    registryLineageEnabled,
 		},

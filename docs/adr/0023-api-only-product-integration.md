@@ -48,10 +48,11 @@ registry's legacy presentation configuration keys are always false, regardless
 of old flag settings. Metadata validation remains strict, including the shared
 literal public HTTPS and closed declaration profile.
 
-The independent embedding compatibility kit and standalone reference pages are
-deprecated compatibility surfaces. Their existing isolation and protocol
-controls remain enforced while they exist. The independent publisher-review
-application has its own publisher-review executable in the existing signed image.
+The product-session runtime and Harbour presentation entrypoint are absent. Legacy
+UI declarations remain bounded metadata without active grants or messaging. The
+independent KSail release browser consumes its fixed public API directly and sends
+no parent messages. The independent publisher-review application has its own
+publisher-review executable in the existing signed image.
 Its report handler accepts only the publisher-preflight gate and inert assets.
 The old ui-kit publisher route remains available; observing consuming deployments
 switch to the new entrypoint is required before removing that executable.
@@ -80,8 +81,8 @@ the installed test alone does not authorize rejecting legacy declarations.
   navigation and bounded dependency traces. It observes no product records.
 - Specialised interactions belong to consumer applications and need their own
   domain-specific design; a machine-readable API does not provide that UX.
-- The registry has no product UI fallback. Existing applications needing the
-  deprecated compatibility kit remain a separate, explicitly bounded migration.
+- The registry has no product UI fallback. Applications use named API outputs and
+  their own transport and rendering; retired presentation settings cannot restore a session.
 - Source validation, publication, installed rollout and independent consumer use
   remain distinct evidence. Normal signed immutable GitOps rollback is the
   production recovery path.

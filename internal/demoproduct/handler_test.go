@@ -10,7 +10,38 @@ import (
 	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
 )
 
-func TestHandlerPublishesPortableContractAndProductUI(t *testing.T) {
+// TestRetiredPresentationRoutes keeps the public API and independent release consumer usable.
+func TestRetiredPresentationRoutes(t *testing.T) {
+	t.Parallel()
+	handler := demoproduct.NewHandler()
+	for _, path := range []string{"/ui", "/assets/product.js", "/assets/product.css", "/ui-contract-config", "/ksail-releases/ui-contract-config"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(
+			response,
+			httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil),
+		)
+		if response.Code != http.StatusNotFound {
+			t.Errorf("retired route %s: status=%d want=404", path, response.Code)
+		}
+	}
+	for _, path := range []string{"/api/observations", "/openapi.json", "/healthz", "/ksail-releases/ui", "/ksail-releases/openapi.json", "/ksail-releases/assets/product.js"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(
+			response,
+			httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil),
+		)
+		if response.Code != http.StatusOK {
+			t.Errorf("retained route %s: status=%d want=200", path, response.Code)
+		}
+		if strings.Contains(response.Body.String(), "postMessage") ||
+			strings.Contains(response.Body.String(), "ui-contract-config") ||
+			strings.Contains(response.Body.String(), "data-product-ui/") {
+			t.Errorf("retained route %s publishes the retired presentation runtime", path)
+		}
+	}
+}
+
+func TestHandlerPublishesPortableContract(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -24,12 +55,6 @@ func TestHandlerPublishesPortableContractAndProductUI(t *testing.T) {
 			path:        "/openapi.json",
 			contentType: "application/json",
 			contains:    `"title":"Harbour observations"`,
-		},
-		{
-			name:        "decentralized product UI",
-			path:        "/ui",
-			contentType: "text/html; charset=utf-8",
-			contains:    "<title>Harbour observations</title>",
 		},
 	}
 
@@ -148,25 +173,5 @@ func TestHandlerRejectsUnsupportedMethods(t *testing.T) {
 
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusMethodNotAllowed)
-	}
-}
-
-// TestUIProtocolDefaultsOff verifies that an unconfigured product publishes no trusted host origins.
-func TestUIProtocolDefaultsOff(t *testing.T) {
-	t.Parallel()
-	response := httptest.NewRecorder()
-	demoproduct.NewHandler().
-		ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), "GET", "/ui-contract-config", nil))
-	var config struct {
-		HostOrigins []string `json:"hostOrigins"`
-	}
-	if response.Code != http.StatusOK {
-		t.Fatalf("configuration status=%d", response.Code)
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &config); err != nil {
-		t.Fatal(err)
-	}
-	if len(config.HostOrigins) != 0 {
-		t.Fatal("unconfigured product must not trust a host")
 	}
 }

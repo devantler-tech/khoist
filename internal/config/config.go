@@ -35,16 +35,6 @@ func CompositionEnabled(value string) (bool, error) {
 	return featureEnabled("COMPOSITION_ENABLED", value)
 }
 
-// UIContractEnabled parses the default-off portable UI host release flag.
-func UIContractEnabled(value string) (bool, error) {
-	return featureEnabled("UI_CONTRACT_ENABLED", value)
-}
-
-// UIAppearanceEnabled parses the default-off v2 presentation grant gate.
-func UIAppearanceEnabled(value string) (bool, error) {
-	return featureEnabled("UI_APPEARANCE_ENABLED", value)
-}
-
 // RegistryDiscoveryEnabled parses the default-off portable inventory and descriptor release gate.
 func RegistryDiscoveryEnabled(value string) (bool, error) {
 	return featureEnabled("REGISTRY_DISCOVERY_ENABLED", value)

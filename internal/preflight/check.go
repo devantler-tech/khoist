@@ -265,12 +265,6 @@ func declaredFeatures(product *data.DataProduct) []string {
 	if len(product.Spec.ContractChecks) != 0 {
 		required["contract-readiness"] = true
 	}
-	if product.Spec.UI != nil && product.Spec.UI.Contract != nil {
-		required["ui-contract"] = true
-		if product.Spec.UI.Contract.APIVersion == "data-product-ui/v2" {
-			required["ui-appearance"] = true
-		}
-	}
 	if product.Annotations["data.devantler.tech/dcat-type"] == "Dataset" {
 		required["dcat-catalog"] = true
 	}

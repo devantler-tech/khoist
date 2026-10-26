@@ -150,8 +150,21 @@ func TestRegistryAssetFingerprints(t *testing.T) {
 	)
 	urls := regexp.MustCompile(`/assets/[a-z-]+-[a-f0-9]{64}\.(js|css)`).
 		FindAllString(document.Body.String(), -1)
-	if len(urls) != 6 {
-		t.Fatalf("document references %d fingerprinted assets, want 6", len(urls))
+	if len(urls) != 5 || strings.Contains(document.Body.String(), "ui-contract.js") {
+		t.Fatalf(
+			"document references %d fingerprinted assets, want the five inert workspace assets",
+			len(urls),
+		)
+	}
+	for _, url := range []string{"/assets/ui-contract.js", "/assets/ui-contract-" + strings.Repeat("0", 64) + ".js"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(
+			response,
+			httptest.NewRequestWithContext(t.Context(), http.MethodGet, url, nil),
+		)
+		if response.Code != http.StatusNotFound {
+			t.Fatal("registry exposed a retired presentation runtime")
+		}
 	}
 	for _, url := range urls {
 		response := httptest.NewRecorder()

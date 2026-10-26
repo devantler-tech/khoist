@@ -10,7 +10,7 @@ import (
 
 // TestDescriptorNumericTokensRemainLossless exercises real local import before any navigation.
 func TestDescriptorNumericTokensRemainLossless(t *testing.T) {
-	page, host, publisher, calls := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, calls := metadataInspectionFixture(t)
 	wire := descriptorJSON(t, offlineDescriptor(host, publisher))
 	for _, tc := range []struct {
 		token string
@@ -28,12 +28,7 @@ func TestDescriptorNumericTokensRemainLossless(t *testing.T) {
 		t.Run(tc.token, func(t *testing.T) {
 			changed := strings.Replace(wire, `"generation":7`, `"generation":`+tc.token, 1)
 			before := calls.Load()
-			page.MustElement("#descriptor").MustSelectAllText().MustInput(changed)
-			page.MustElement("#import-descriptor").MustClick()
-			page.MustElement("#kit-status").
-				MustWait(`()=>['ready','invalid'].includes(this.dataset.state)`)
-			ready := page.MustEval(`()=>document.querySelector('#kit-status').dataset.state==='ready'`).
-				Bool()
+			ready := inspectDescriptor(t, page, changed)
 			if ready != tc.valid {
 				t.Fatalf("lossless admission=%t want=%t", ready, tc.valid)
 			}
@@ -46,7 +41,7 @@ func TestDescriptorNumericTokensRemainLossless(t *testing.T) {
 
 // TestDescriptorHealthObservationRelations retains producer-consistent independent states.
 func TestDescriptorHealthObservationRelations(t *testing.T) {
-	page, host, publisher, _ := kitWorkspaceFixture(t, false, false)
+	page, host, publisher, _ := metadataInspectionFixture(t)
 	for _, tc := range []struct {
 		state    string
 		observed int
@@ -79,7 +74,7 @@ func TestDescriptorHealthObservationRelations(t *testing.T) {
 
 // TestRawIntegerAndBudgetBoundaries admits exact exponent notation and preserves caller limits.
 func TestRawIntegerAndBudgetBoundaries(t *testing.T) {
-	page, _, _, _ := kitWorkspaceFixture(t, false, false)
+	page, _, _, _ := metadataInspectionFixture(t)
 	for _, tc := range []struct {
 		wire  string
 		valid bool

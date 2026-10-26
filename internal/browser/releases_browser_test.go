@@ -45,9 +45,7 @@ func releaseBrowserPage(t *testing.T, body string, contentType string, code int)
 	}))
 	t.Cleanup(host.Close)
 	options := demoproduct.HandlerOptions{
-		PublicBaseURL:     product.URL,
-		HostOrigins:       []string{host.URL},
-		AppearanceEnabled: true,
+		PublicBaseURL: product.URL,
 	}
 	handler, err := demoproduct.NewHandlerWithOptions(options)
 	if err != nil {
@@ -110,22 +108,17 @@ func TestKSailReleaseBrowserFiltersWithoutSourceReads(t *testing.T) {
 		t.Fatal("explicit refresh did not read the source once")
 	}
 	t.Log("explicit refresh complete")
-	view.page.MustEval(`() => {
-		window.productMessages = [];
-		window.addEventListener('message', (event) => window.productMessages.push(event.data));
-		document.querySelector('iframe').contentWindow.postMessage({apiVersion:'data-product-ui/v2',type:'init',session:'11111111-1111-1111-1111-111111111111',capabilities:['appearance']}, '*');
-	}`)
-	view.page.MustElement("iframe").
-		MustWait(`() => window.productMessages.some(message => message.type === 'ready')`)
-	t.Log("presentation session ready")
 	view.page.MustEval(
-		`() => document.querySelector('iframe').contentWindow.postMessage({apiVersion:'data-product-ui/v2',type:'appearance',session:'11111111-1111-1111-1111-111111111111',appearance:'dark'}, '*')`,
+		`() => {window.productMessages=[];window.addEventListener('message',e=>window.productMessages.push(e.data));document.querySelector('iframe').contentWindow.postMessage({apiVersion:'data-product-ui/v2',type:'init',session:'11111111-1111-1111-1111-111111111111',capabilities:['appearance']},'*');}`,
 	)
-	view.frame.MustElement("html").
-		MustWait(`() => getComputedStyle(this).backgroundColor === 'rgb(0, 0, 0)'`)
-	if view.frame.MustElement("#status").MustText() != "1 of 2 releases" {
-		t.Fatal("appearance lost the loaded selection")
+	view.frame.MustEval(
+		`async()=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));}`,
+	)
+	if view.page.MustEval(`()=>window.productMessages.length`).Int() != 0 ||
+		view.frame.MustElement("#status").MustText() != "1 of 2 releases" {
+		t.Fatal("retired presentation messaging changed independent release state")
 	}
+
 	view.page.MustSetViewport(375, 812, 1, false)
 	if view.frame.MustEval(`() => document.documentElement.scrollWidth > innerWidth`).Bool() {
 		t.Fatal("release view overflows a narrow screen")

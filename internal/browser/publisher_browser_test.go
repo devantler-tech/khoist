@@ -198,78 +198,6 @@ func TestPublisherInspectionWithoutPresentationRuntime(t *testing.T) {
 	}
 }
 
-// TestPublisherWorkspaceNavigation starts at the host, reviews a saved report and leaves it safely.
-func TestPublisherWorkspaceNavigation(t *testing.T) {
-	var requests atomic.Int64
-	product := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		requests.Add(1)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer product.Close()
-	report, err := json.Marshal(publisherReport(t, false, product.URL))
-	if err != nil {
-		t.Fatal(err)
-	}
-	host := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-		PublisherEnabled: func() bool { return true },
-		ContractEnabled:  func() bool { return true },
-	}))
-	defer host.Close()
-	page := contractBrowser(
-		t,
-	).MustPage().
-		Timeout(20 * time.Second).
-		MustNavigate(host.URL + "/").
-		MustWaitLoad()
-	page.MustElement("#workspace-navigation a[href='/publisher-review']").MustFocus()
-	page.KeyActions().Type(input.Enter).MustDo()
-	page.MustWaitLoad()
-	page.MustWait(`()=>location.pathname==='/publisher-review'`)
-	if page.MustElement("#workspace-navigation [aria-current='page']").
-		MustText() !=
-		"Publisher review" {
-		t.Fatal("navigation did not identify the current workspace")
-	}
-	page.MustElement(".import-fields details summary").MustClick()
-	page.MustElement("#report-text").MustInput(string(report))
-	page.MustElement("#read-report").MustClick()
-	page.MustElement("#report-status").MustWait(`()=>this.dataset.state==='accepted'`)
-	page.MustElement("#product-list button[data-key='products/a-consumer']").MustClick()
-	if !strings.Contains(page.MustElement(".product-inputs").MustText(), "products/z-producer") {
-		t.Fatal("root navigation lost report input inspection")
-	}
-	page.MustElement(".product-inputs button").MustClick()
-	if page.MustElement("#preview-title").MustText() != "z-producer" {
-		t.Fatal("root navigation lost local producer inspection")
-	}
-	for _, theme := range []string{"Light", "Dark"} {
-		page.MustElement("#theme").MustSelect(theme)
-		page.MustSetViewport(390, 844, 1, false)
-		if page.MustEval(`()=>document.documentElement.scrollWidth>innerWidth`).Bool() {
-			t.Fatal("workspace navigation overflowed on a narrow screen")
-		}
-	}
-	if requests.Load() != 0 || len(page.MustElements("iframe")) != 0 {
-		t.Fatal("publisher navigation contacted or mounted a product")
-	}
-	page.MustElement("#workspace-navigation a[href='/']").MustClick()
-	page.MustWaitLoad()
-	page.MustWait(`()=>location.pathname==='/'`)
-	if page.MustElement("#workspace-navigation [aria-current='page']").
-		MustText() !=
-		"Product UI workspace" {
-		t.Fatal("return navigation did not identify the product workspace")
-	}
-	page.MustEval(`()=>history.back()`)
-	page.MustWait(`()=>location.pathname==='/publisher-review'`)
-	page.MustWait(
-		`()=>document.querySelector('#review').hidden && document.querySelector('#export-preview').disabled`,
-	)
-	if requests.Load() != 0 || len(page.MustElements("iframe")) != 0 {
-		t.Fatal("history restoration contacted or mounted a product")
-	}
-}
-
 // TestPublisherDeclaredInputs reviews the shipped composition through a real saved report.
 func TestPublisherDeclaredInputs(t *testing.T) {
 	file, err := os.ReadFile("../../docs/examples/composition.yaml")
@@ -465,99 +393,7 @@ func TestPublisherReviewWorkflow(t *testing.T) {
 	}
 }
 
-// TestWorkspaceAppearanceNavigation shares the author's choice without retaining report state.
-func TestWorkspaceAppearanceNavigation(t *testing.T) {
-	host := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-		PublisherEnabled: func() bool { return true },
-		ContractEnabled:  func() bool { return true },
-	}))
-	defer host.Close()
-	page := contractBrowser(t).MustPage().Timeout(20 * time.Second).
-		MustNavigate(host.URL + "/").MustWaitLoad()
-	page.MustElement("#appearance").MustSelect("Dark")
-	page.MustElement("#workspace-navigation a[href='/publisher-review']").MustClick()
-	page.MustWaitLoad()
-	if page.MustElement("#theme").MustProperty("value").Str() != "Dark" {
-		t.Fatal("publisher navigation lost the selected dark theme")
-	}
-	page.MustElement("#theme").MustSelect("Light")
-	page.MustElement("#workspace-navigation a[href='/']").MustClick()
-	page.MustWaitLoad()
-	if page.MustElement("#appearance").MustProperty("value").Str() != "light" {
-		t.Fatal("product workspace navigation lost the selected light theme")
-	}
-	page.MustEval(`()=>{
-		dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
-		localStorage.setItem('data-product-kit.appearance','dark');
-		dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));
-	}`)
-	if page.MustElement("#appearance").MustProperty("value").Str() != "dark" ||
-		page.MustEval(`()=>document.querySelector('iframe').hasAttribute('src')`).Bool() {
-		t.Fatal("restored product workspace lost the current theme or reopened an interface")
-	}
-	page.MustElement("#workspace-navigation a[href='/publisher-review']").MustClick()
-	page.MustWaitLoad()
-	report, err := json.Marshal(publisherReport(t, false, ""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	page.MustElement(".import-fields details summary").MustClick()
-	page.MustElement("#report-text").MustInput(string(report))
-	page.MustElement("#read-report").MustClick()
-	page.MustElement("#report-status").MustWait(`()=>this.dataset.state==='accepted'`)
-	page.MustEval(`()=>{
-		dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
-		localStorage.setItem('data-product-kit.appearance','system');
-		dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));
-	}`)
-	if page.MustElement("#theme").MustProperty("value").Str() != "System" ||
-		page.MustEval(`()=>!document.querySelector('#review').hidden || !document.querySelector('#export-preview').disabled`).
-			Bool() {
-		t.Fatal("restored publisher lost the current theme or retained a report")
-	}
-}
-
-// TestWorkspaceAppearanceHistory follows real browser Back on both workspaces.
-func TestWorkspaceAppearanceHistory(t *testing.T) {
-	host := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-		PublisherEnabled: func() bool { return true },
-		ContractEnabled:  func() bool { return true },
-	}))
-	defer host.Close()
-	page := contractBrowser(t).MustPage().Timeout(20 * time.Second).
-		MustNavigate(host.URL + "/").MustWaitLoad()
-	page.MustElement("#appearance").MustSelect("Light")
-	page.MustElement("#workspace-navigation a[href='/publisher-review']").MustClick()
-	page.MustWaitLoad()
-	page.MustElement("#theme").MustSelect("Dark")
-	page.MustNavigateBack().MustWaitLoad()
-	if page.MustElement("#appearance").MustProperty("value").Str() != "dark" ||
-		page.MustEval(`()=>document.querySelector('iframe').hasAttribute('src')`).Bool() {
-		t.Fatal("browser Back lost the product theme or reopened an interface")
-	}
-	page.MustElement("#appearance").MustSelect("Light")
-	page.MustElement("#workspace-navigation a[href='/publisher-review']").MustClick()
-	page.MustWaitLoad()
-	report, err := json.Marshal(publisherReport(t, false, ""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	page.MustElement(".import-fields details summary").MustClick()
-	page.MustElement("#report-text").MustInput(string(report))
-	page.MustElement("#read-report").MustClick()
-	page.MustElement("#report-status").MustWait(`()=>this.dataset.state==='accepted'`)
-	page.MustElement("#workspace-navigation a[href='/']").MustClick()
-	page.MustWaitLoad()
-	page.MustElement("#appearance").MustSelect("Dark")
-	page.MustNavigateBack().MustWaitLoad()
-	if page.MustElement("#theme").MustProperty("value").Str() != "Dark" ||
-		page.MustEval(`()=>!document.querySelector('#review').hidden || !document.querySelector('#export-preview').disabled`).
-			Bool() {
-		t.Fatal("browser Back lost the publisher theme or retained a report")
-	}
-}
-
-// TestWorkspaceAppearancePreferences validates existing, legacy and malformed choices from both entry points.
+// TestPublisherAppearancePreferences validates existing, legacy and malformed choices from both entry points.
 // Storage is seeded once for each page, so the second workspace reads what the first one stored.
 func TestWorkspaceAppearancePreferences(t *testing.T) {
 	for _, test := range []struct{ name, shared, legacy, want, stored string }{
@@ -575,10 +411,7 @@ func TestWorkspaceAppearancePreferences(t *testing.T) {
 			{"publisher-first", []string{"/publisher-review", "/"}},
 		} {
 			t.Run(test.name+"/"+entry.name, func(t *testing.T) {
-				host := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-					PublisherEnabled: func() bool { return true },
-					ContractEnabled:  func() bool { return true },
-				}))
+				host := httptest.NewTLSServer(web.PublisherHandler(func() bool { return true }))
 				defer host.Close()
 				page := contractBrowser(t).MustPage().Timeout(20 * time.Second)
 				page.MustEvalOnNewDocument(fmt.Sprintf(`(()=>{
@@ -819,8 +652,8 @@ func TestPublisherReportAdmissionAndReadRace(t *testing.T) {
 	}
 }
 
-// TestPublisherVisibleUIRequirements joins mandatory visible gates to their declaration origins.
-func TestPublisherVisibleUIRequirements(t *testing.T) {
+// TestPublisherLegacyUIReportCompatibility accepts bounded metadata and historical report identifiers without execution.
+func TestPublisherLegacyUIReportCompatibility(t *testing.T) {
 	host := publisherHost(t)
 	page := contractBrowser(
 		t,
@@ -859,15 +692,16 @@ func TestPublisherVisibleUIRequirements(t *testing.T) {
 			Bool() {
 			t.Fatal("actual emitted report rejected")
 		}
-		required := []string{"ui-contract"}
-		if version == "data-product-ui/v2" {
-			required = append(required, "ui-appearance")
+		if len(report.RequiredFeatures) != 0 {
+			t.Fatal("legacy UI metadata advertised retired runtime gates")
 		}
-		for _, feature := range required {
-			if !page.MustEval(`(wire,feature)=>{const r=JSON.parse(wire);r.productFeatures.forEach(entry=>entry.requiredFeatures=entry.requiredFeatures.filter(f=>f!==feature));r.requiredFeatures=r.requiredFeatures.filter(f=>f!==feature);try{DataProductPreflightReport.parse(JSON.stringify(r));return false;}catch{return true;}}`, string(encoded), feature).
-				Bool() {
-				t.Fatalf("missing %s accepted for %s", feature, version)
-			}
+		features := []string{"ui-contract"}
+		if version == "data-product-ui/v2" {
+			features = []string{"ui-appearance", "ui-contract"}
+		}
+		if !page.MustEval(`(wire,features)=>{const r=JSON.parse(wire);r.productFeatures.forEach(entry=>entry.requiredFeatures=features);r.requiredFeatures=features;try{DataProductPreflightReport.parse(JSON.stringify(r));return typeof DataProductUI==='undefined'&&document.querySelectorAll('iframe').length===0;}catch{return false;}}`, string(encoded), features).
+			Bool() {
+			t.Fatal("historical report identifiers lost inert publisher compatibility")
 		}
 	}
 }

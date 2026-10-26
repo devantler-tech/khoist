@@ -384,10 +384,7 @@ func assertDiscoveryExportImports(t *testing.T, description string) {
 		}),
 	)
 	t.Cleanup(productServer.Close)
-	kit := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-		ContractEnabled:  func() bool { return true },
-		DiscoveryEnabled: func() bool { return true },
-	}))
+	kit := httptest.NewTLSServer(web.PublisherHandler(func() bool { return true }))
 	t.Cleanup(kit.Close)
 	product := workspaceProduct(productServer.URL)
 	product.Spec.Name = strings.Repeat("n", 16000)
@@ -453,21 +450,9 @@ func assertDiscoveryExportImports(t *testing.T, description string) {
 		t.Fatal("download changed public descriptor metadata")
 	}
 	kitPage := browser.MustPage().Timeout(15 * time.Second).MustNavigate(kit.URL).MustWaitLoad()
-	kitPage.MustEval(`text => {
-		document.querySelector('#descriptor').value = text;
-		document.querySelector('#descriptor-form').requestSubmit();
-	}`, download)
-	kitPage.MustElement("#kit-status").
-		MustWait(`() => this.dataset.state==='ready' || this.dataset.state==='invalid'`)
-	if kitPage.MustEval(`() => document.querySelector('#kit-status').dataset.state`).
-		Str() !=
-		"ready" {
-		t.Fatalf(
-			"actual %d-byte API descriptor exported as %d bytes and failed offline import: %s",
-			len(wire),
-			len(download),
-			kitPage.MustElement("#kit-status").MustText(),
-		)
+	if !kitPage.MustEval(`text => {try {DataProductDescriptor.validate(DataProductDescriptor.parseJSON(text));return typeof DataProductUI==='undefined'&&document.querySelectorAll('iframe').length===0;}catch{return false;}}`, download).
+		Bool() {
+		t.Fatal("downloaded public descriptor failed inert offline inspection")
 	}
 	if len(download) > 65536 {
 		t.Fatalf("download exceeded the public contract: %d bytes", len(download))

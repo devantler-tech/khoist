@@ -8,18 +8,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	datav1alpha1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
 	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
 	"github.com/devantler-tech/data-product-controller/internal/registry"
-	"github.com/devantler-tech/data-product-controller/web"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -67,63 +63,6 @@ func TestDeletingProductUpdatesRegistryObservation(t *testing.T) {
 				t.Fatal("deleting product opened or retained a surface")
 			}
 		})
-	}
-}
-
-// TestDescriptorFileRejectsMalformedUTF8 catches File.text silently replacing invalid bytes and mounting changed metadata.
-func TestDescriptorFileRejectsMalformedUTF8(t *testing.T) {
-	var navigations atomic.Int32
-	product := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		navigations.Add(1)
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write(
-			[]byte(
-				`<!doctype html><script>addEventListener('message',e=>{if(e.source===parent&&e.data.type==='init')parent.postMessage({apiVersion:e.data.apiVersion,type:'ready',session:e.data.session},e.origin);});</script>`,
-			),
-		)
-	}))
-	t.Cleanup(product.Close)
-	kit := httptest.NewTLSServer(web.KitHandlerWithOptions(web.KitOptions{
-		ContractEnabled: func() bool { return true }, DiscoveryEnabled: func() bool { return true },
-	}))
-	t.Cleanup(kit.Close)
-	page := contractBrowser(
-		t,
-	).MustPage().
-		Timeout(15 * time.Second).
-		MustNavigate(kit.URL).
-		MustWaitLoad()
-	wire := descriptorJSON(t, offlineDescriptor(kit.URL, product.URL))
-	page.MustEval(
-		`(wire) => {document.querySelector('#descriptor').value=wire; document.querySelector('#descriptor-form').requestSubmit();}`,
-		wire,
-	)
-	page.MustElement("#kit-status").MustWait(`() => this.dataset.state === 'ready'`)
-	before := navigations.Load()
-	malformed := []byte(
-		strings.Replace(
-			wire,
-			"Public observations",
-			"Public "+string([]byte{0xff})+" observations",
-			1,
-		),
-	)
-	file := filepath.Join(t.TempDir(), "malformed.json")
-	if err := os.WriteFile(file, malformed, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	page.MustEval(`() => {document.querySelector('#descriptor').value='';}`)
-	page.MustElement("#descriptor-file").MustSetFiles(file)
-	page.MustElement("#import-descriptor").MustClick()
-	page.MustElement("#kit-status").
-		MustWait(`() => ['invalid','ready'].includes(this.dataset.state)`)
-	if page.MustEval(`() => document.querySelector('#kit-status').dataset.state`).
-		Str() !=
-		"invalid" ||
-		page.MustEval(`() => document.querySelector('#product-surface').hasAttribute('src')`).
-			Bool() ||
-		navigations.Load() != before {
-		t.Fatal("malformed UTF-8 was changed into an accepted descriptor or retained a session")
 	}
 }
 

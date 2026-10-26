@@ -21,7 +21,7 @@ func TestPublicURLPolicy(t *testing.T) {
 			request := httptest.NewRequestWithContext(
 				t.Context(),
 				"GET",
-				"https://untrusted.example/ui",
+				"https://untrusted.example/ksail-releases/ui",
 				nil,
 			)
 			request.Header.Set("X-Forwarded-Host", "other.example")
@@ -30,7 +30,7 @@ func TestPublicURLPolicy(t *testing.T) {
 			policy := response.Header().Get("Content-Security-Policy")
 			if !strings.Contains(
 				policy,
-				"connect-src "+base+"/api/observations "+base+"/ui-contract-config;",
+				"connect-src https://api.github.com/repos/devantler-tech/ksail/releases;",
 			) {
 				t.Fatalf("policy does not admit the configured read paths: %s", policy)
 			}
@@ -67,8 +67,14 @@ func TestPublicURLValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequestWithContext(t.Context(), "GET", "/ui", nil))
-	if !strings.Contains(response.Header().Get("Content-Security-Policy"), "connect-src 'self';") {
+	handler.ServeHTTP(
+		response,
+		httptest.NewRequestWithContext(t.Context(), "GET", "/ksail-releases/ui", nil),
+	)
+	if !strings.Contains(
+		response.Header().Get("Content-Security-Policy"),
+		"connect-src https://api.github.com/repos/devantler-tech/ksail/releases;",
+	) {
 		t.Fatal("unconfigured standalone policy changed")
 	}
 }

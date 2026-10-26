@@ -82,8 +82,7 @@ func TestAuthenticatedWorkspace(t *testing.T) {
 			})
 			var err error
 			productHandler, err = demoproduct.NewHandlerWithOptions(demoproduct.HandlerOptions{
-				PublicBaseURL: productOrigin, HostOrigins: []string{catalog.URL},
-				AppearanceEnabled: appearance,
+				PublicBaseURL: productOrigin,
 			})
 			if err != nil {
 				t.Fatal(err)

@@ -218,21 +218,24 @@ func TestIndependentPublisherReportReader(t *testing.T) {
 			t.Fatal(err)
 		}
 		read(t, original, true)
-		features := []string{"ui-contract"}
+		if len(report.RequiredFeatures) != 0 {
+			t.Fatal("inert UI metadata requires retired runtime gates")
+		}
+		// Historical v2 reports retain their public identifiers as data, without enabling runtime behavior.
+		features := []any{"ui-contract"}
 		if version == "data-product-ui/v2" {
-			features = append(features, "ui-appearance")
+			features = []any{"ui-appearance", "ui-contract"}
 		}
-		for _, feature := range features {
-			t.Run(version+"/"+feature, func(t *testing.T) {
-				value := reportValue(t, report)
-				omitReportFeature(t, value, feature)
-				wire, err := json.Marshal(value)
-				if err != nil {
-					t.Fatal(err)
-				}
-				read(t, wire, false)
-			})
+		value := reportValue(t, report)
+		value["requiredFeatures"] = features
+		for _, entry := range reportArray(t, value["productFeatures"]) {
+			reportObject(t, entry)["requiredFeatures"] = features
 		}
+		wire, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read(t, wire, true)
 	}
 }
 

@@ -1,143 +1,53 @@
-// Package web distributes the portable UI protocol and a static compatibility host.
-// It has no dependency on Kubernetes or the registry implementation.
+// Package web distributes inert publisher-review assets without product execution.
 package web
 
 import (
 	"embed"
-	"io/fs"
 	"net/http"
-	"strings"
 )
 
-// Assets contains the independently hostable compatibility kit and browser library.
+// Assets contains only publisher review and bounded metadata inspection libraries.
 //
-//go:embed *.js *.html *.css
+//go:embed metadata.js descriptor.js publisher.html publisher.css publisher.js preflight-report.js
 var Assets embed.FS
 
-// KitHandler serves the portable kit behind its caller's release flag with a restrictive host policy.
-func KitHandler(enabled func() bool) http.Handler {
-	return KitHandlerWithAppearance(enabled, func() bool { return false })
-}
-
-// KitHandlerWithAppearance advertises an independently default-off appearance grant without network requests.
-func KitHandlerWithAppearance(enabled, appearanceEnabled func() bool) http.Handler {
-	return KitHandlerWithOptions(
-		KitOptions{ContractEnabled: enabled, AppearanceEnabled: appearanceEnabled},
-	)
-}
-
-// KitOptions holds independently default-off presentation and offline discovery release gates.
-type KitOptions struct {
-	ContractEnabled   func() bool
-	AppearanceEnabled func() bool
-	DiscoveryEnabled  func() bool
-	PublisherEnabled  func() bool
-}
-
-// KitHandlerWithOptions enables offline descriptor handoff without introducing registry or network access.
-func KitHandlerWithOptions(options KitOptions) http.Handler {
-	return portableHandler(options, CompatibilityAssets)
-}
-
-// PublisherHandler serves only offline report inspection under its existing release gate.
-// Presentation and discovery callbacks cannot be supplied to this handler.
+// PublisherHandler serves offline report inspection under its independent release gate.
 func PublisherHandler(enabled func() bool) http.Handler {
-	return portableHandler(KitOptions{PublisherEnabled: enabled}, Assets)
-}
-
-// portableHandler shares bounded assets and policy while keeping presentation opt-in explicit.
-func portableHandler(options KitOptions, assets fs.FS) http.Handler {
-	files := http.FileServerFS(assets)
+	files := http.FileServerFS(Assets)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		publisher := options.PublisherEnabled != nil && options.PublisherEnabled()
-		contract := options.ContractEnabled != nil && options.ContractEnabled()
-		reportAsset, sharedAsset, kitAsset := false, false, false
-		switch r.URL.Path {
-		case "/publisher-review",
-			"/publisher.html",
-			"/publisher.css",
-			"/publisher.js",
-			"/preflight-report.js":
-			reportAsset = true
-		case "/metadata.js", "/descriptor.js":
-			sharedAsset = true
-		case "/", "/index.html", "/kit.css", "/kit.js", "/ui-contract.js":
-			kitAsset = true
-		}
-		publisherRoot := publisher && !contract &&
-			(r.URL.Path == "/" || r.URL.Path == "/index.html")
-		allowed := publisher && reportAsset || (publisher || contract) && sharedAsset ||
-			contract && kitAsset || publisherRoot
-		if !allowed ||
+		if enabled == nil || !enabled() ||
 			(r.Method != http.MethodGet && r.Method != http.MethodHead) {
 			http.NotFound(w, r)
 			return
 		}
-		frames := "'none'"
-		if contract && !reportAsset {
-			frames = "https:"
+		switch r.URL.Path {
+		case "/",
+			"/index.html",
+			"/publisher-review",
+			"/publisher.html",
+			"/publisher.css",
+			"/publisher.js",
+			"/preflight-report.js",
+			"/metadata.js",
+			"/descriptor.js":
+		default:
+			http.NotFound(w, r)
+			return
 		}
 		w.Header().
-			Set("Content-Security-Policy", "default-src 'self'; connect-src 'none'; frame-src "+frames+"; frame-ancestors 'none'; object-src 'none'; base-uri 'none'")
+			Set("Content-Security-Policy", "default-src 'self'; connect-src 'none'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if publisherRoot {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 			http.Redirect(w, r, "/publisher-review", http.StatusTemporaryRedirect)
 			return
 		}
-		if r.URL.Path == "/publisher-review" || r.URL.Path == "/publisher.html" {
-			page, err := Assets.ReadFile("publisher.html")
-			if err != nil {
-				http.Error(w, "publisher review unavailable", http.StatusInternalServerError)
-				return
-			}
-			if contract {
-				page = workspaceNavigation(page, true)
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if r.Method == http.MethodGet {
-				_, _ = w.Write(page)
-			}
-			return
-		}
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
-			page, err := Assets.ReadFile("index.html")
-			if err != nil {
-				http.Error(w, "kit unavailable", http.StatusInternalServerError)
-				return
-			}
-			body := "<body"
-			if options.AppearanceEnabled != nil && options.AppearanceEnabled() {
-				body += ` data-appearance-enabled="true"`
-			}
-			if options.DiscoveryEnabled != nil && options.DiscoveryEnabled() {
-				body += ` data-discovery-enabled="true"`
-			}
-			page = []byte(strings.Replace(string(page), "<body>", body+">", 1))
-			if publisher {
-				page = workspaceNavigation(page, false)
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.Header().Set("Cache-Control", "no-store")
-			if r.Method == http.MethodGet {
-				_, _ = w.Write(page)
-			}
-			return
+		if r.URL.Path == "/publisher-review" {
+			r = r.Clone(r.Context())
+			r.URL.Path = "/publisher.html"
 		}
 		files.ServeHTTP(w, r)
 	})
-}
-
-// workspaceNavigation inserts only fixed local links when both workspaces are enabled.
-func workspaceNavigation(page []byte, publisherPage bool) []byte {
-	kitCurrent, publisherCurrent := ` aria-current="page"`, ""
-	if publisherPage {
-		kitCurrent, publisherCurrent = "", ` aria-current="page"`
-	}
-	navigation := `<nav id="workspace-navigation" class="workspace-navigation" aria-label="Workspaces">` +
-		`<a href="/"` + kitCurrent + `>Product UI workspace</a>` +
-		`<a href="/publisher-review"` + publisherCurrent + `>Publisher review</a></nav>`
-	return []byte(strings.Replace(string(page), "<!-- workspace-navigation -->", navigation, 1))
 }

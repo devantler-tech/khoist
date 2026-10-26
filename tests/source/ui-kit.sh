@@ -91,40 +91,18 @@ start_host() {
 }
 
 for mode in tls gateway; do
-	for state in default false true; do
-		start_host "$mode" "$state"
+	for state in default false true invalid; do
+		start_host "$mode" "$state" "$state"
 		request /healthz 200
 		[[ $(wc -c <"$test_dir/body") -eq 3 && $(cat "$test_dir/body") == ok ]]
 		grep -Fi 'cache-control: no-store' "$test_dir/headers" >/dev/null
-		request /publisher-review 404
-		request /publisher.js 404
-		if [[ "$state" == true ]]; then
-			request / 200
-			grep -F 'ui-contract.js' "$test_dir/body" >/dev/null
-			grep -F "connect-src 'none'" "$test_dir/headers" >/dev/null
-			request /ui-contract.js 200
-			grep -F 'DataProductUI' "$test_dir/body" >/dev/null
-			request /kit.js 200
-			request /kit.css 200
-		else
-			request / 404
-			request /ui-contract.js 404
-		fi
+		for path in / /index.html /publisher-review /publisher.js /ui-contract.js /kit.js /kit.css; do request "$path" 404; done
 		docker rm --force "$container_id" >/dev/null
 		container_id=''
-		echo "PASS: packaged UI host ($mode, UI contract $state)"
+		echo "PASS: packaged host refuses retired product sessions ($mode, legacy $state)"
 	done
 done
 
-start_host tls true true
-request / 200
-grep -F '<body data-appearance-enabled="true">' "$test_dir/body" >/dev/null
-request /ui-contract.js 200
-grep -F 'DataProductUI' "$test_dir/body" >/dev/null
-echo 'PASS: packaged UI host preserves explicit v2 appearance grants'
-
-docker rm --force "$container_id" >/dev/null
-container_id=''
 for mode in tls gateway; do
 	for publisher in default false true; do
 		start_host "$mode" false false "$publisher"
@@ -162,15 +140,15 @@ done
 
 for mode in tls gateway; do
 	start_host "$mode" true true true
-	request / 200
-	grep -F 'aria-current="page">Product UI workspace' "$test_dir/body" >/dev/null
-	grep -F 'href="/publisher-review"' "$test_dir/body" >/dev/null
+	request / 307
 	request /publisher-review 200
-	grep -F 'aria-current="page">Publisher review' "$test_dir/body" >/dev/null
-	grep -F 'href="/"' "$test_dir/body" >/dev/null
+	grep -F 'preflight-report.js' "$test_dir/body" >/dev/null
+	! grep -F 'ui-contract.js' "$test_dir/body"
+	! grep -F 'Product UI workspace' "$test_dir/body"
 	grep -F "frame-src 'none'" "$test_dir/headers" >/dev/null
 	grep -F "connect-src 'none'" "$test_dir/headers" >/dev/null
+	for path in /ui-contract.js /kit.js /kit.css; do request "$path" 404; done
 	docker rm --force "$container_id" >/dev/null
 	container_id=''
-	echo "PASS: packaged host links both enabled workspaces ($mode)"
+	echo "PASS: publisher remains independent with retired flags set ($mode)"
 done

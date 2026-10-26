@@ -384,10 +384,6 @@ func descriptor(value any) (publicProduct, error) {
 			if version != "data-product-ui/v1" && version != "data-product-ui/v2" {
 				return result, errUnsupported
 			}
-			result.requiredFeatures["ui-contract"] = true
-			if version == "data-product-ui/v2" {
-				result.requiredFeatures["ui-appearance"] = true
-			}
 			origins, err := array(contract["hostOrigins"], 16)
 			if err != nil || len(origins) == 0 {
 				return result, errUnsupported

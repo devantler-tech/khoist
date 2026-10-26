@@ -22,7 +22,7 @@ owns the product.
 ## Try it locally
 
 The repository includes an example data product, *Harbour observations*, that serves two fixed,
-made-up measurements, the description of its API, and its own web page. The measurements are built
+made-up measurements and the description of its API. The measurements are built
 into the program; it reads no external source. Running it shows what a product publishes. It does not run the controller or the registry, and it needs no Kubernetes
 cluster, account or credentials.
 
@@ -61,9 +61,9 @@ It answers with the two sample measurements:
 {"items":[{"station":"nordhavn","temperatureCelsius":16.8,"salinityPsu":14.2,"observedAt":"2026-08-29T12:00:00Z"},{"station":"refshaleoen","temperatureCelsius":17.1,"salinityPsu":13.9,"observedAt":"2026-08-29T12:05:00Z"}]}
 ```
 
-Then open `http://127.0.0.1:8080/ui` in a browser. The page shows the same two rows in a table,
-and **Load observations** filters them by station. The API description that other tools read is at
-`http://127.0.0.1:8080/openapi.json`.
+Filter the API response with `curl "http://127.0.0.1:8080/api/observations?station=nordhavn"`.
+The API description that other tools read is at `http://127.0.0.1:8080/openapi.json`.
+Consumer applications own their presentation.
 
 Press `Ctrl+C` in the first terminal to stop the example. It writes no files; Go keeps the
 downloaded dependencies and build results in its usual caches.
@@ -142,12 +142,9 @@ or promise that an endpoint is reachable. **Refresh products** withdraws the old
 descriptor and reloads the inventory. With discovery enabled, an explicit product
 link is reread before its current metadata is shown.
 
-The Harbour example labels its fixed synthetic records and displays station, observation time in
-UTC, temperature and salinity. Choose a station and use **Load observations** to filter the data.
-The latest requested station owns the result, even if an earlier request finishes later.
-Use the workspace's **Open API** and **View contract** links to open the published
-interfaces explicitly. Standalone reference pages remain deprecated examples of
-API consumption; they are not embedded by the registry.
+The Harbour API serves fixed synthetic observations with station, UTC observation time, temperature
+and salinity. Consumers can select a station with the `station` query parameter. Use the workspace's
+**Open API** and **View contract** links to open the published interfaces explicitly.
 
 The optional [KSail release product](docs/ksail-releases.md) displays real published versions,
 UTC dates and channels from GitHub. Its filters use the loaded public API page, and **Refresh
@@ -156,32 +153,27 @@ the controller receives no release records. The workload serves its release inte
 an opt-in switch. Optional catalogue publication is default-off and activated through
 deployment-owned chart values; unlisting the product does not withdraw its direct interfaces.
 
-The registry and Harbour pages use content-addressed scripts and styles. Their HTML is not
+The registry and independent release browser use content-addressed scripts and styles. Their HTML is not
 cached, so upgrades load the matching assets even when a browser or CDN retains an older release.
 
 The sample's `PUBLIC_BASE_URL` declares the HTTPS address under which its endpoints are published.
-The deprecated kit permits credential-free reads of only the observation and
-UI-configuration paths when embedded, including in Safari. The chart derives this address from its shared-host route, or accepts
+The chart derives this address from its shared-host route, or accepts
 `demoProduct.publicBaseURL` for a separate host. Values contain an exact HTTPS origin and an optional
 path prefix of letters, digits, underscores and hyphens, without a trailing slash. Request and
-forwarded host headers never select the allowed address. Without this setting, standalone use
-retains the same-origin policy.
+forwarded host headers never select that address. The independent release browser connects only
+to the fixed public GitHub release API.
 
 The registry validates public metadata and exposes only explicit, credential-free
 HTTPS interface links. Its browser policy denies frames and permits connections
 only to its own API. It passes no bearer token, Secret or Kubernetes identity to
 publishers, and never imports their JavaScript.
 
-The chart and declaration above publish API interfaces without `spec.ui`. This is
-a breaking change for consumers that used chart-authored UI metadata: select a
-named output and its standard contract instead. Direct reference pages remain
-available. Existing hand-authored legacy `spec.ui` and descriptor fields remain
-bounded compatibility metadata.
-The registry grants no product presentation capabilities, regardless of legacy
-flag settings. The independent compatibility kit remains deprecated and retains
-its restrictive sandbox and protocol controls; [its guide](docs/ui-contract.md)
-describes that existing runtime. Versioned schema/runtime retirement and normal
-Platform adoption are tracked in [#390](https://github.com/devantler-tech/khoist/issues/390).
+The chart publishes API interfaces without `spec.ui`. Existing hand-authored legacy UI and
+descriptor fields remain bounded compatibility metadata, with [their constraints documented here](docs/ui-contract.md).
+The product-session runtime and its activation flags are absent. The independent
+[publisher-review application](docs/publisher-preflight.md) remains available; existing `/ui-kit`
+deployments serve only that application under its own gate. Versioned metadata retirement and
+normal Platform adoption remain tracked in [#390](https://github.com/devantler-tech/khoist/issues/390).
 
 The workspace offers System, Light and Dark appearance with an orange accent.
 An explicit choice stays in browser storage when available; denied storage does
@@ -189,7 +181,7 @@ not prevent discovery or inspection. Workspace appearance does not send product
 messages, contact publishers or change selected metadata. Consumer applications
 own their own appearance and data-access policy.
 
-The sample product and standalone UI kit handle SIGTERM and interrupt by closing
+The sample API and independent publisher hosts handle SIGTERM and interrupt by closing
 their listeners and waiting up to ten seconds for active responses to finish.
 They close remaining connections on timeout and exit unsuccessfully if shutdown
 fails.
@@ -217,7 +209,7 @@ The current foundation provides:
 - a default-off [offline DSP catalog exporter](docs/dsp-catalog.md) that combines DCAT snapshots with explicit provider services, transfer formats and offers;
 - a default-off [publisher preflight command](docs/publisher-preflight.md) that validates local manifests and previews public descriptors before GitOps publication;
 - an API-only registry workspace that inspects public descriptors and exposes explicit standard interface links;
-- a default-off, versioned UI manifest and capability protocol, with an independent compatibility kit;
+- inert validation of bounded legacy UI metadata, with no product-session runtime;
 - an independently deployed harbour-observations example with its own OpenAPI contract, query API, and UI;
 - a live [KSail release browser](docs/ksail-releases.md) with optional catalogue publication, its external public query contract and bounded, credential-free reads;
 - an opt-in, Secret-backed HTTPS JSON export connector with a read-only API, OpenAPI contract, probes, and metrics;

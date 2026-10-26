@@ -3,8 +3,7 @@
 The standard query output is the fixed public GitHub release API. Consumer
 applications own its presentation and transport. The API-only registry displays
 that output and its OpenAPI contract without loading the reference page or
-querying GitHub. Standalone reference pages and the independent embedding kit
-remain deprecated compatibility; see
+querying GitHub. The reference browser is an independent consumer with no presentation session; see
 [ADR 0023](adr/0023-api-only-product-integration.md).
 
 The optional KSail release product shows published versions, UTC publication times and release
@@ -39,12 +38,11 @@ No source Secret, Kubernetes API token, extra workload or workload source-egress
 required. Public interface metadata grants no additional access. Removing chart-authored
 UI metadata is a breaking publication change; consumers
 select the named API output and contract. The direct reference page remains
-available. The chart's `uiContract` and `uiAppearance` settings still control the
-retained compatibility runtime, independently of catalogue publication;
-light/dark display preserves filters and does not request source data.
+available. The retired `uiContract` and `uiAppearance` settings have no effect.
+Display follows the consumer's own styling and requests no presentation grants.
 
-The workload always serves `/ksail-releases/ui`, `/ksail-releases/openapi.json`,
-`/ksail-releases/ui-contract-config` and its route-specific assets. The temporary
+The workload always serves `/ksail-releases/ui`, `/ksail-releases/openapi.json`
+and its route-specific assets. Presentation configuration routes return 404. The temporary
 `KSAIL_RELEASES_ENABLED` / `ksail-releases` runtime gate has been removed after live acceptance.
 The chart no longer emits that environment setting; remove it from hand-authored deployments
 when adopting this breaking release. The remaining chart publication setting is independent:
@@ -64,17 +62,15 @@ rendering any row. Empty, malformed, oversized, redirected or unavailable respon
 empty/failure treatment; an older page never substitutes for a failed refresh.
 
 GitHub controls availability, default-page ordering and anonymous request allowance. Each initial
-view and explicit refresh makes one source request; filters, theme changes and idle viewing make
+view and explicit refresh makes one source request; filters and idle viewing make
 none. There are no background polls or automatic retries. A source limit appears as an unavailable
 read with an explicit retry action. Workload readiness means the interface is serving, not that
 GitHub currently responds.
 
 Navigation aborts pending reads and clears the retained page. Persisted history restoration rereads
-the public configuration and source; responses from an earlier refresh or page lifetime cannot
-replace the current view. If the deprecated kit is used, its opaque iframe sandbox
-and exact publisher-origin/session checks remain required. That host receives
-bounded status and resize hints, never release records. The registry grants no
-presentation capabilities and runs no product interface.
+the public source; responses from an earlier refresh or page lifetime cannot replace the current
+view. The consumer sends no parent messages, establishes no session and exposes no presentation
+configuration endpoint. The registry grants no presentation capabilities and runs no product interface.
 
 Platform owns immutable signed adoption through normal GitOps. This public source does not
 establish the private credential-backed HTTP connector's rollout or authorization criteria.
