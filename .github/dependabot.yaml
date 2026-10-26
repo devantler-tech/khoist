@@ -23,3 +23,8 @@ updates:
       # devantler-tech actions/workflows are our own code — bump now, no cooldown.
       exclude:
         - "devantler-tech/*"
+    ignore:
+      # The platform only accepts publisher revisions it has approved for this
+      # consumer; move this pin by hand once devantler-tech/platform#5275 approves
+      # a newer one (an automatic bump broke regeneration in #489 and #498).
+      - dependency-name: "devantler-tech/.github/.github/workflows/publish-app.yaml"
