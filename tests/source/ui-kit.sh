@@ -143,8 +143,10 @@ for mode in tls gateway; do
 	request / 307
 	request /publisher-review 200
 	grep -F 'preflight-report.js' "$test_dir/body" >/dev/null
-	! grep -F 'ui-contract.js' "$test_dir/body"
-	! grep -F 'Product UI workspace' "$test_dir/body"
+	if grep -F -e 'ui-contract.js' -e 'Product UI workspace' "$test_dir/body" >/dev/null; then
+		echo 'publisher host exposed retired presentation content' >&2
+		exit 1
+	fi
 	grep -F "frame-src 'none'" "$test_dir/headers" >/dev/null
 	grep -F "connect-src 'none'" "$test_dir/headers" >/dev/null
 	for path in /ui-contract.js /kit.js /kit.css; do request "$path" 404; done
