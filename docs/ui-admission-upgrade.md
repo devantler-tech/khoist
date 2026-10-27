@@ -11,31 +11,44 @@ not remove the optional UI property from historical descriptor/report formats.
 
 ## Upgrade
 
-1. Verify the selected release's chart and image signatures and pin their immutable
-   digests using [released artifact acceptance](release-acceptance.md). Retain the
-   previously verified chart, image and Helm revision for rollback.
-2. Remove `spec.ui` from newly published declarations. The offline publisher check
-   rejects it under both profiles without changing either report format. A complete
-   inventory of existing declarations is required before the later field removal,
-   rather than as a prerequisite for this ratcheting stage.
-3. **Explicitly apply the selected release's CRD before upgrading workloads.** Helm
-   does not upgrade CRDs from `crds/`. After verifying and downloading the chart to
-   `release-chart.tgz`, use the target cluster's normal reviewed deployment process:
+### 1. Verify and retain the releases
 
-   ```sh
-   helm show crds ./release-chart.tgz > release-crds.yaml
-   kubectl apply -f release-crds.yaml
-   kubectl wait crd/dataproducts.data.devantler.tech --for=condition=Established --timeout=60s
-   ```
+Verify the selected release's chart and image signatures and pin their immutable
+digests using [released artifact acceptance](release-acceptance.md). Retain the
+previously verified chart, image and Helm revision for rollback.
 
-4. Read the live CRD back. Its `v1alpha1` schema must retain the typed `spec.ui`
-   property with `x-kubernetes-validations` rule `false` and message
-   `API-only products do not support spec.ui; remove it`. `status.storedVersions`
-   must remain `[v1alpha1]`. A successful Helm upgrade alone does not prove this.
-5. Upgrade the workloads using that same verified chart and image digest. Confirm
-   current product readiness and the independently authorised query paths. Record
-   deployment and inventory evidence in
-   [platform#4890](https://github.com/devantler-tech/platform/issues/4890).
+### 2. Remove UI from new publications
+
+Remove `spec.ui` from newly published declarations. The offline publisher check
+rejects it under both profiles without changing either report format. A complete
+inventory of existing declarations is required before the later field removal,
+rather than as a prerequisite for this ratcheting stage.
+
+### 3. Apply the verified CRD explicitly
+
+**Explicitly apply the selected release's CRD before upgrading workloads.** Helm
+does not upgrade CRDs from `crds/`. After verifying and downloading the chart to
+`release-chart.tgz`, use the target cluster's normal reviewed deployment process:
+
+```sh
+helm show crds ./release-chart.tgz > release-crds.yaml
+kubectl apply -f release-crds.yaml
+kubectl wait crd/dataproducts.data.devantler.tech --for=condition=Established --timeout=60s
+```
+
+### 4. Verify the live admission rule
+
+Read the live CRD back. Its `v1alpha1` schema must retain the typed `spec.ui`
+property with `x-kubernetes-validations` rule `false` and message
+`API-only products do not support spec.ui; remove it`. `status.storedVersions`
+must remain `[v1alpha1]`. A successful Helm upgrade alone does not prove this.
+
+### 5. Upgrade and observe the workloads
+
+Upgrade the workloads using that same verified chart and image digest. Confirm
+current product readiness and the independently authorised query paths. Record
+deployment and inventory evidence in
+[platform#4890](https://github.com/devantler-tech/platform/issues/4890).
 
 ## Recover
 

@@ -82,11 +82,6 @@ chart_publication_lifecycle() {
 	local baseline_dir=$test_dir/publication-release revision allowance crd_uid
 	publication_helm list --all --filter '^dpc-publication$' --output json | jq -e 'length == 0' >/dev/null
 	publication_products_absent
-	# The historical v4 rollback reintroduces UI, which Stage 1 deliberately rejects.
-	# Run that older compatibility contract under the signed v8 schema in this owned
-	# fixture; the preceding latest-release lifecycle verifies the delivered policy.
-	crd_uid=$(publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -er '.metadata.uid')
-	ui_admission_schema "$test_dir/ui-admission-release/release-chart.tgz" false "$crd_uid"
 	allowance=$(publication_budget)
 	((allowance <= 180)) || allowance=180
 	bash "$repo_root/scripts/verify-release-artifacts.sh" --profile data-product-controller --tag v4.0.0 \
@@ -112,6 +107,12 @@ uiContract:
 uiAppearance:
   enabled: true
 YAML
+	# The historical v4 rollback reintroduces UI, which Stage 1 deliberately rejects.
+	# Run that older compatibility contract under the signed v8 schema in this owned
+	# fixture; the preceding latest-release lifecycle verifies the delivered policy.
+	# Keep all absence and signature/receipt guards before any schema mutation.
+	crd_uid=$(publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -er '.metadata.uid')
+	ui_admission_schema "$test_dir/ui-admission-release/release-chart.tgz" false "$crd_uid"
 	publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -S '{uid:.metadata.uid,spec:.spec}' >"$test_dir/publication-original-crd.json"
 	# --skip-crds is essential: Helm handles crds/ separately from post-rendered templates.
 	publication_helm upgrade --install dpc-publication "$baseline_dir/release-chart.tgz" --reset-values \

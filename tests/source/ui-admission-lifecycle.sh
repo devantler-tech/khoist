@@ -43,14 +43,14 @@ ui_admission_release_lifecycle() {
 		--source-sha f8025c710b76d3809870176cf1fcd0c75ff8ff32 \
 		--image-digest sha256:633fcc5efde4b0023e612e5a2dae6ce3aa3eb8a2800ed5cf152f0efc486e1a43 \
 		--chart-digest sha256:d9eb5e1c3f16113d5e513110683c5158ca3aa03afd24d643e2ff59dd67160d61 \
-		--publisher-repository devantler-tech/.github --publisher-sha f5d078cc4b04ecb15432ed4e34cba1142a6279d4 \
+		--publisher-repository devantler-tech/.github --publisher-sha 467f07582436a26b62cf4aa756423512f85ba0c0 \
 		--platform linux/amd64 --output-dir "$release_dir" --timeout "$allowance"
 	jq -se 'length == 1 and (.[0] | .complete == true and .tag == "v8.0.0" and
     .releaseProfile == "khoist" and .sourceSHA == "f8025c710b76d3809870176cf1fcd0c75ff8ff32" and
     .imageDigest == "sha256:633fcc5efde4b0023e612e5a2dae6ce3aa3eb8a2800ed5cf152f0efc486e1a43" and
     .chartDigest == "sha256:d9eb5e1c3f16113d5e513110683c5158ca3aa03afd24d643e2ff59dd67160d61" and
     .publisherRepository == "devantler-tech/.github" and
-    .publisherSHA == "f5d078cc4b04ecb15432ed4e34cba1142a6279d4" and .platform == "linux/amd64")' "$release_dir/release.json" >/dev/null
+    .publisherSHA == "467f07582436a26b62cf4aa756423512f85ba0c0" and .platform == "linux/amd64")' "$release_dir/release.json" >/dev/null
 	crd_uid=$(publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -er '.metadata.uid | select(length > 0)')
 	# Only the owned fixture temporarily restores the released contract to seed pre-existing UI.
 	ui_admission_schema "$release_dir/release-chart.tgz" false "$crd_uid"

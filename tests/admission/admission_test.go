@@ -496,6 +496,35 @@ func TestAPIOnlyAdmissionMigration(t *testing.T) {
 			return err
 		}, "must be of type object", metav1.CauseTypeTypeInvalid)
 	})
+	t.Run("new-ui-protocols", func(t *testing.T) {
+		f := f.with(t)
+		for _, version := range []string{"v1", "v2"} {
+			p := product("new-"+version, true)
+			set(t, p, map[string]any{
+				"apiVersion":   "data-product-ui/" + version,
+				"hostOrigins":  []any{"https://catalog.example"},
+				"capabilities": []any{"status", "resize"},
+			}, "spec", "ui", "contract")
+			f.deny(p.GetName(), func() error {
+				_, err := f.products.Create(f.ctx, p, metav1.CreateOptions{})
+				return err
+			}, policyMessage)
+		}
+		p := product("invalid-appearance", true)
+		set(t, p, map[string]any{
+			"apiVersion":   "data-product-ui/v1",
+			"hostOrigins":  []any{"https://catalog.example"},
+			"capabilities": []any{"appearance"},
+		}, "spec", "ui", "contract")
+		_, err := f.products.Create(f.ctx, p, metav1.CreateOptions{})
+		if !rejected(err, "spec.ui.contract", "Appearance requires data-product-ui/v2") {
+			t.Fatalf("delivered schema lost the nested appearance negative control: %v", err)
+		}
+		_, err = f.products.Get(f.ctx, p.GetName(), metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			t.Fatalf("rejected appearance persisted or read failed: %v", err)
+		}
+	})
 	t.Run("unchanged-legacy-updates", func(t *testing.T) {
 		f := f.with(t)
 		want := f.get("legacy")

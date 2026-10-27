@@ -237,6 +237,7 @@ candidate_chart=$test_dir/candidate.tgz
 integration_deadline=$((SECONDS + 60))
 source "$repo_root/tests/source/chart-publication.sh"
 source "$repo_root/tests/source/helm-lifecycle.sh"
+source "$repo_root/tests/source/ui-admission-lifecycle.sh"
 source "$repo_root/tests/source/installed-matrix.sh"
 # The verified receipt is supplied at the external verifier boundary; consumption remains real.
 bash() {
