@@ -419,11 +419,17 @@ publication_kube() {
  cat "$PUBLICATION_TEST_WORK/stage1-$selection.json"
 }
 ui_admission_product_snapshot baseline
+if [[ $1 == rollback || $1 == restored ]]; then
+ selection=previous
+ ui_admission_product_snapshot candidate
+ [[ $1 != restored ]] || ui_admission_product_snapshot rollback
+fi
 selection=after
 ui_admission_product_snapshot "$1"
 EOF
 for phase in candidate rollback restored after-crd-apply; do
-	for fault in unchanged later-time reordered earlier-time invalid-time lost-status changed-status changed-reason changed-message stale-generation lost-condition changed-spec changed-ui replaced-product; do
+	for fault in unchanged later-time reordered earlier-time invalid-time lost-status changed-status changed-reason changed-message stale-generation lost-condition changed-spec changed-ui replaced-product regressed-since-predecessor later-than-predecessor; do
+		cp "$work/stage1-before.json" "$work/stage1-previous.json"
 		case $fault in
 		unchanged) cp "$work/stage1-before.json" "$work/stage1-after.json" ;;
 		later-time) jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:01:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
@@ -439,10 +445,18 @@ for phase in candidate rollback restored after-crd-apply; do
 		changed-spec) jq '.spec.name="Changed product"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
 		changed-ui) jq '.spec.ui.title="Changed UI"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
 		replaced-product) jq '.metadata.uid="replacement"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		regressed-since-predecessor | later-than-predecessor)
+			[[ $phase == rollback || $phase == restored ]] || continue
+			jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:02:00Z"' "$work/stage1-before.json" >"$work/stage1-previous.json"
+			jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:01:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json"
+			if [[ $fault == later-than-predecessor ]]; then
+				jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:03:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json"
+			fi
+			;;
 		esac
 		result=0
 		"$BASH" "$work/stage1-snapshot-check.sh" "$phase" >"$work/stage1-snapshot.log" 2>&1 || result=$?
-		if [[ $fault == unchanged || ($phase != after-crd-apply && ($fault == later-time || $fault == reordered)) ]]; then
+		if [[ $fault == unchanged || $fault == later-than-predecessor || ($phase != after-crd-apply && ($fault == later-time || $fault == reordered)) ]]; then
 			[[ $result == 0 ]] || {
 				echo "Stage 1 snapshot rejected valid $phase state: $fault (exit $result)" >&2
 				cat "$work/stage1-snapshot.log" >&2

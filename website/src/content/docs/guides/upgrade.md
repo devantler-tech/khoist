@@ -31,7 +31,7 @@ removed. After applying this release's CRD, read it back and verify the rejectin
 rule at `spec.ui` and the unchanged `[v1alpha1]` stored version. Restoring UI writes
 requires explicitly applying the previous verified release's full CRD; a Helm
 rollback alone keeps the newer rejection policy. Follow the
-[accepted migration decision](https://github.com/devantler-tech/khoist/blob/main/docs/adr/0024-retire-legacy-ui-declaration-within-v1alpha1.md).
+[Stage 1 upgrade and recovery procedure](https://github.com/devantler-tech/khoist/blob/3d54a180f108b62e2eaf8c42a7d6e253456fe3ed/docs/ui-admission-upgrade.md).
 
 ## Upgrade workloads
 

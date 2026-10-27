@@ -21,7 +21,11 @@ ui_admission_schema() {
 
 # ui_admission_product_snapshot preserves status content while real rollout transition clocks may advance.
 ui_admission_product_snapshot() {
-	local phase=$1
+	local phase=$1 previous=baseline
+	case $phase in
+	rollback) previous=candidate ;;
+	restored) previous=rollback ;;
+	esac
 	publication_kube get dataproduct existing-export -o json | jq -Se '
     . as $product |
     select((.metadata.uid | type == "string" and length > 0) and .metadata.deletionTimestamp == null and
@@ -41,7 +45,7 @@ ui_admission_product_snapshot() {
 		cmp "$test_dir/ui-admission-baseline-raw-product.json" "$test_dir/ui-admission-$phase-raw-product.json"
 	elif [[ $phase != baseline ]]; then
 		cmp "$test_dir/ui-admission-baseline-product.json" "$test_dir/ui-admission-$phase-product.json"
-		jq -e --slurpfile before "$test_dir/ui-admission-baseline-raw-product.json" '
+		jq -e --slurpfile before "$test_dir/ui-admission-$previous-raw-product.json" '
       . as $after | all($before[0].status.conditions[]; . as $old |
         any($after.status.conditions[]; .type == $old.type and
           (.lastTransitionTime | fromdateiso8601) >= ($old.lastTransitionTime | fromdateiso8601)))' \
