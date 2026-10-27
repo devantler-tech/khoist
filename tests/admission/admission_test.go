@@ -83,7 +83,7 @@ func newFixture(t *testing.T) *fixture {
 		}
 		t.Setenv("TEST_ASSET_"+strings.ToUpper(strings.ReplaceAll(name, "-", "_")), path)
 	}
-	baseline, err := os.ReadFile("testdata/khoist-v8.0.0-crd.yaml")
+	baseline, err := os.ReadFile("testdata/khoist-v8.0.0-crd.raw")
 	check(t, err)
 	hash := sha256.Sum256(baseline)
 	if hex.EncodeToString(

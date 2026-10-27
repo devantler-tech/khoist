@@ -13,8 +13,17 @@ historical readers; do not regenerate them with the current create schema, which
 correctly rejects new UI. Browser URL/contract mutations occur only in these
 historical report objects and still pass the real report reader's validation.
 
-SHA256:
+The repository's JSON formatter subsequently changed whitespace only; parsed
+report values were compared to the raw captures and remained identical.
+
+Raw capture SHA256:
 
 - protocol v1: `199935d42cb49cf257a7a3bc82ff7f4d17c48a04e9209f7a9a35f83811132f89`
 - protocol v2: `fee9034668b3a35faea914363a8719b30e6e08e6eb9253438be49aa54dc151bd`
 - legacy composition: `fff6413b56991bfea203e4ae0dedfb05439be582b0b9019a83016eb2df6021b2`
+
+Formatted fixture SHA256:
+
+- protocol v1: `e66b5adb84f5c8427655c32ee20981b7aab2c1c10898eb17cfca946242fa1ec9`
+- protocol v2: `94edfd57daacf880a233c51d32ddfb1a2bee1b844487c1b5442a1c255446c2f3`
+- legacy composition: `c23c0a7ae32fb9600daeca010d89b269f5e81d7379daa59450c6842e19cb4a21`
