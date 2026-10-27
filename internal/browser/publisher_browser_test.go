@@ -30,7 +30,8 @@ func publisherReport(t *testing.T, cycle bool, uiURL string) preflight.BundleRep
 	return publisherContractReport(t, cycle, uiURL, nil)
 }
 
-// publisherContractReport evaluates real products with optional legacy presentation metadata.
+// publisherContractReport evaluates current data-only products. Legacy inspection
+// cases use saved v8 reports, not newly admitted UI declarations.
 func publisherContractReport(
 	t *testing.T,
 	cycle bool,
@@ -38,6 +39,12 @@ func publisherContractReport(
 	contract *data.UIContract,
 ) preflight.BundleReport {
 	t.Helper()
+	if uiURL != "" {
+		if cycle {
+			t.Fatal("historical UI fixture does not describe a cyclic publication")
+		}
+		return historicalPublisherReport(t, uiURL, contract)
+	}
 	product := func(name string) data.DataProduct {
 		return data.DataProduct{
 			TypeMeta: metav1.TypeMeta{
@@ -79,13 +86,6 @@ func publisherContractReport(
 			},
 		}
 	}
-	if uiURL != "" {
-		consumer.Spec.UI = &data.ProductUI{
-			URL:      uiURL,
-			Title:    "External product",
-			Contract: contract,
-		}
-	}
 	readers := []io.Reader{}
 	for _, p := range []data.DataProduct{consumer, producer} {
 		encoded, err := json.Marshal(p)
@@ -94,15 +94,66 @@ func publisherContractReport(
 		}
 		readers = append(readers, strings.NewReader(string(encoded)))
 	}
-	check := preflight.CheckBundle
-	if uiURL == "" {
-		check = preflight.CheckAPIOnlyBundle
-	}
-	result := check(t.Context(), readers, "")
+	result := preflight.CheckAPIOnlyBundle(t.Context(), readers, "")
 	if result.Complete == cycle || (!cycle && !result.Valid) {
 		t.Fatalf("unexpected evaluator fixture: %+v", result)
 	}
 	return result
+}
+
+// historicalPublisherReport mutates only inert presentation metadata in an actual
+// saved v8 composition. The browser still validates and inspects the whole report.
+func historicalPublisherReport(
+	t *testing.T,
+	uiURL string,
+	contract *data.UIContract,
+) preflight.BundleReport {
+	t.Helper()
+	encoded, err := os.ReadFile(
+		"../preflight/testdata/khoist-v8-legacy-composition-preflight-v2.json",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report preflight.BundleReport
+	if err := json.Unmarshal(encoded, &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.APIVersion != "data-product-preflight/v2" || !report.Valid || !report.Complete ||
+		report.Products != 2 || len(report.Descriptors) != 2 || report.Plan == nil {
+		t.Fatal("historical composition fixture is incomplete")
+	}
+	changed := 0
+	for i, raw := range report.Descriptors {
+		var descriptor map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &descriptor); err != nil {
+			t.Fatal(err)
+		}
+		if string(descriptor["name"]) != `"a-consumer"` {
+			continue
+		}
+		var ui data.ProductUI
+		if len(descriptor["ui"]) == 0 {
+			t.Fatal("historical consumer lost its UI metadata")
+		}
+		if err := json.Unmarshal(descriptor["ui"], &ui); err != nil {
+			t.Fatal(err)
+		}
+		ui.URL, ui.Contract = uiURL, contract
+		descriptor["ui"], err = json.Marshal(ui)
+		if err != nil {
+			t.Fatal(err)
+		}
+		report.Descriptors[i], err = json.Marshal(descriptor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed++
+	}
+	if changed != 1 {
+		t.Fatal("historical composition does not have exactly one expected consumer")
+	}
+	return report
 }
 
 // publisherHost serves the enabled publisher-only handler over fixture TLS and registers server cleanup.
@@ -661,42 +712,34 @@ func TestPublisherLegacyUIReportCompatibility(t *testing.T) {
 		MustNavigate(host.URL + "/publisher-review").
 		MustWaitLoad()
 	page.MustWait(`()=>typeof DataProductPreflightReport==='object'`)
-	for _, version := range []string{"data-product-ui/v1", "data-product-ui/v2"} {
-		p := workspaceProduct("https://product.example.test")
-		p.TypeMeta = metav1.TypeMeta{
-			APIVersion: "data.devantler.tech/v1alpha1",
-			Kind:       "DataProduct",
+	for _, version := range []string{"v1", "v2"} {
+		var encoded []byte
+		var err error
+		if version == "v1" {
+			encoded, err = os.ReadFile(
+				"../preflight/testdata/khoist-v8-ui-protocol-v1-preflight-v2.json",
+			)
+		} else {
+			encoded, err = os.ReadFile(
+				"../preflight/testdata/khoist-v8-ui-protocol-v2-preflight-v2.json",
+			)
 		}
-		p.Spec.UI.Contract = &data.UIContract{
-			APIVersion:   version,
-			HostOrigins:  []data.UIHostOrigin{"https://host.example.test"},
-			Capabilities: []data.UICapability{},
-		}
-		wire, err := json.Marshal(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		report := preflight.CheckBundle(
-			t.Context(),
-			[]io.Reader{strings.NewReader(string(wire))},
-			"",
-		)
-		if !report.Valid || !report.Complete {
-			t.Fatalf("invalid report fixture: %+v", report.Diagnostics)
-		}
-		encoded, err := json.Marshal(report)
-		if err != nil {
+		var report preflight.BundleReport
+		if err := json.Unmarshal(encoded, &report); err != nil {
 			t.Fatal(err)
 		}
 		if !page.MustEval(`wire=>{try{DataProductPreflightReport.parse(wire);return true;}catch{return false;}}`, string(encoded)).
 			Bool() {
-			t.Fatal("actual emitted report rejected")
+			t.Fatal("saved v8 report rejected")
 		}
 		if len(report.RequiredFeatures) != 0 {
 			t.Fatal("legacy UI metadata advertised retired runtime gates")
 		}
 		features := []string{"ui-contract"}
-		if version == "data-product-ui/v2" {
+		if version == "v2" {
 			features = []string{"ui-appearance", "ui-contract"}
 		}
 		if !page.MustEval(`(wire,features)=>{const r=JSON.parse(wire);r.productFeatures.forEach(entry=>entry.requiredFeatures=features);r.requiredFeatures=features;try{DataProductPreflightReport.parse(JSON.stringify(r));return typeof DataProductUI==='undefined'&&document.querySelectorAll('iframe').length===0;}catch{return false;}}`, string(encoded), features).

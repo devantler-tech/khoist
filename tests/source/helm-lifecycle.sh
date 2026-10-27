@@ -131,6 +131,7 @@ helm_release_lifecycle() {
 	helm_installed_identity "$candidate_version" "localhost:5055/data-product-controller@$product_digest" "${candidate_chart_name:?packaged candidate chart name required}"
 	installed_observation restored-candidate "localhost:5055/data-product-controller@$product_digest" "$product_digest" KHoist
 	installed_query_check
+	ui_admission_release_lifecycle
 	chart_publication_lifecycle
 	kube delete dataproduct existing-export --wait=true --timeout=20s >/dev/null
 	[[ $(independent_resource_uids "$lifecycle_product_uid") == "$lifecycle_resource_uids" ]]

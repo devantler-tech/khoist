@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-// TestAPIOnlyProfileRequiresDataInterfaces preserves the compatibility default and both report versions.
+// TestAPIOnlyProfileRequiresDataInterfaces preserves both report formats while
+// every profile follows the delivered schema's rejection of new UI declarations.
 func TestAPIOnlyProfileRequiresDataInterfaces(t *testing.T) {
 	withUI := strings.Replace(validManifest, `"spec":{`,
 		`"spec":{"ui":{"url":"https://ui.example.test/PRIVATE_UI","title":"PRIVATE_TITLE"},`, 1)
@@ -35,7 +36,7 @@ func TestAPIOnlyProfileRequiresDataInterfaces(t *testing.T) {
 					var compatibility, explicit bytes.Buffer
 					code, err := run(context.Background(), args, "true", &compatibility)
 					wantCompatibility := 0
-					if fixture.name == "null UI" {
+					if !fixture.accepted {
 						wantCompatibility = 1
 					}
 					if code != wantCompatibility || err != nil {

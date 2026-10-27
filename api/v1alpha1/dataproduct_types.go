@@ -292,7 +292,9 @@ type DataProductSpec struct {
 	// +listMapKey=name
 	Outputs []OutputPort `json:"outputs"`
 
-	// UI is an optional independently deployed product interaction surface.
+	// UI retains unchanged legacy declarations during the API-only migration.
+	// New declarations and UI changes are rejected; remove this field.
+	// +kubebuilder:validation:XValidation:rule="false",message="API-only products do not support spec.ui; remove it"
 	UI *ProductUI `json:"ui,omitempty"`
 
 	// Source optionally requires a provisioned resource and its published connection Secret to be ready.

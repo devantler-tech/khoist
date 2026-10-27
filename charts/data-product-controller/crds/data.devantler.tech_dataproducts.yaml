@@ -402,8 +402,9 @@ spec:
                     + ''-ca'',self.resourceRef.name + ''-client'']))) : self.adapter
                     == ''crossplane/v1'''
               ui:
-                description: UI is an optional independently deployed product interaction
-                  surface.
+                description: |-
+                  UI retains unchanged legacy declarations during the API-only migration.
+                  New declarations and UI changes are rejected; remove this field.
                 properties:
                   contract:
                     description: Contract optionally opts into the versioned, capability-limited
@@ -466,6 +467,9 @@ spec:
                 - title
                 - url
                 type: object
+                x-kubernetes-validations:
+                - message: API-only products do not support spec.ui; remove it
+                  rule: "false"
               version:
                 description: Version is the product contract's semantic version.
                 pattern: ^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$

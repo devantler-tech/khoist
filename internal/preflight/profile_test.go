@@ -74,9 +74,10 @@ func TestAPIOnlyRejectsLegacyUIWithoutLeakingMetadata(t *testing.T) {
 		}
 		selection := "null\n---\n" + bundle(t, p)
 		legacy := selected(t, selection)
-		if !legacy.Valid || !legacy.Complete || len(legacy.Descriptors) != 1 {
-			t.Fatalf("compatibility control failed for %s: %+v", version, legacy)
+		if legacy.Valid || legacy.Complete || len(legacy.Descriptors) != 0 {
+			t.Fatalf("delivered create schema accepted legacy UI for %s: %+v", version, legacy)
 		}
+		richCode(t, legacy, "CrossFieldInvalid")
 		r := apiBundle(t, bundle(t, product("safe")), selection)
 		d := richCode(t, r, "InvalidUI")
 		if r.Valid || r.Complete || len(r.Descriptors) != 0 || r.Plan != nil ||

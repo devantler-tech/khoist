@@ -1,12 +1,14 @@
 //go:build admission
 
-// Package admission_test exercises a test-only migration policy on an owned API server.
+// Package admission_test upgrades the signed v8 schema to the delivered schema
+// on an owned API server, then restores the released contract.
 package admission_test
 
 import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -39,11 +41,12 @@ import (
 const policyMessage = "API-only products do not support spec.ui; remove it"
 
 type fixture struct {
-	t        *testing.T
-	ctx      context.Context
-	products dynamic.ResourceInterface
-	crds     *extclient.Clientset
-	original *extv1.CustomResourceDefinition
+	t         *testing.T
+	ctx       context.Context
+	products  dynamic.ResourceInterface
+	crds      *extclient.Clientset
+	original  *extv1.CustomResourceDefinition
+	delivered *extv1.CustomResourceDefinition
 }
 
 // check marks its caller as the failure site when a fixture operation returns an error.
@@ -54,7 +57,8 @@ func check(t *testing.T, err error) {
 	}
 }
 
-// newFixture starts an owned API server from explicit versioned assets and installs the delivered CRD.
+// newFixture starts an owned API server from explicit versioned assets and
+// installs the exact CRD extracted from the signed v8.0.0 chart.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	logf.SetLogger(zap.New())
@@ -79,8 +83,18 @@ func newFixture(t *testing.T) *fixture {
 		}
 		t.Setenv("TEST_ASSET_"+strings.ToUpper(strings.ReplaceAll(name, "-", "_")), path)
 	}
-	var original extv1.CustomResourceDefinition
-	check(t, yaml.Unmarshal(crd.DataProductSchema(), &original))
+	baseline, err := os.ReadFile("testdata/khoist-v8.0.0-crd.yaml")
+	check(t, err)
+	hash := sha256.Sum256(baseline)
+	if hex.EncodeToString(
+		hash[:],
+	) != "3ca99ab0f379c7ebef049a3e26c811b64efebead88b0f17ca10c79f96e9e4da0" {
+		t.Fatal("released v8.0.0 CRD fixture identity changed")
+	}
+	var original, delivered extv1.CustomResourceDefinition
+	check(t, yaml.Unmarshal(baseline, &original))
+	check(t, yaml.Unmarshal(crd.DataProductSchema(), &delivered))
+	extv1.SetObjectDefaults_CustomResourceDefinition(&delivered)
 	useExisting := false
 	server := &envtest.Environment{
 		UseExistingCluster: &useExisting, BinaryAssetsDirectory: assets,
@@ -121,10 +135,11 @@ func newFixture(t *testing.T) *fixture {
 		Get(ctx, original.Name, metav1.GetOptions{})
 	check(t, err)
 	f := &fixture{
-		t:        t,
-		ctx:      ctx,
-		crds:     ec,
-		original: installed,
+		t:         t,
+		ctx:       ctx,
+		crds:      ec,
+		original:  installed,
+		delivered: &delivered,
 		products: dc.Resource(schema.GroupVersionResource{Group: "data.devantler.tech", Version: "v1alpha1", Resource: "dataproducts"}).
 			Namespace("admission-products"),
 	}
@@ -136,8 +151,9 @@ func newFixture(t *testing.T) *fixture {
 		recovery.schema(installed.Spec)
 	})
 	t.Logf(
-		"owned API server=%s delivered-schema-sha256=%x",
+		"owned API server=%s released-v8-schema-sha256=%x delivered-schema-sha256=%x",
 		actual.GitVersion,
+		hash,
 		sha256.Sum256(crd.DataProductSchema()),
 	)
 	return f
@@ -370,20 +386,6 @@ func (f *fixture) schema(spec extv1.CustomResourceDefinitionSpec) {
 	}
 }
 
-// candidate copies the delivered schema and attaches the test-only denial rule to its UI field.
-func candidate(original *extv1.CustomResourceDefinition) extv1.CustomResourceDefinitionSpec {
-	copy := original.DeepCopy()
-	spec := copy.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"]
-	ui := spec.Properties["ui"]
-	ui.XValidations = append(
-		ui.XValidations,
-		extv1.ValidationRule{Rule: "false", Message: policyMessage},
-	)
-	spec.Properties["ui"] = ui
-	copy.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"] = spec
-	return copy.Spec
-}
-
 func (f *fixture) activated(field string) {
 	f.t.Helper()
 	accepted := 0
@@ -441,7 +443,7 @@ func TestAPIOnlyAdmissionMigration(t *testing.T) {
 	}
 	check(t, f.apply(product("shared-owners", true), "second-author"))
 	f.uiOwners("shared-owners", "original-author", "second-author")
-	f.schema(candidate(f.original))
+	f.schema(f.delivered.Spec)
 	f.activated("spec.ui")
 	t.Run("create", func(t *testing.T) {
 		f := f.with(t)
@@ -672,7 +674,7 @@ func TestAPIOnlyAdmissionMigration(t *testing.T) {
 		if !reflect.DeepEqual(before.Object, f.get("whole-spec").Object) {
 			t.Fatal("rejected whole-spec control changed stored object")
 		}
-		f.schema(candidate(f.original))
+		f.schema(f.delivered.Spec)
 		f.activated("spec.ui")
 		_, err = f.products.Update(f.ctx, changed, metav1.UpdateOptions{FieldValidation: "Ignore"})
 		check(t, err)

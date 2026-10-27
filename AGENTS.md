@@ -85,8 +85,10 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   redirect rejection, local-only filters, refresh/navigation cancellation and public-source CSP.
   The controller and workload never read release data, and no presentation messages reach a parent.
   Workload readiness does not establish GitHub availability. See `docs/ksail-releases.md`.
-- Legacy UI declarations remain bounded and validated in the CRD and compatible publisher reports
-  until their versioned retirement. Registry responses omit them; workspace configuration exposes
+- The delivered CRD retains typed legacy UI with a rejecting rule at `spec.ui`: creates, additions
+  and changes are denied, while unchanged stored UI ratchets through unrelated edits and can be
+  removed. Keep the field-level placement, message and v1alpha1 storage version. Historical publisher
+  reports retain their bounded UI metadata. Registry responses omit it; workspace configuration exposes
   only discovery and lineage capabilities. No runtime evaluates `ui-contract` or `ui-appearance`;
   product-session assets, grants and messaging are absent. Preserve the independent publisher-review
   application, inert metadata validators and old `/ui-kit` publisher entrypoint until consuming
@@ -129,9 +131,10 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   Preserve default v1 output; explicit `--report-version v2` adds numeric provenance, safe known
   paths, bounded witnesses/counts and a static plan only for complete valid bundles. Raw declarations
   never remain in public reports. Keep the report schema offline and the example reader independent.
-  Explicit `--profile api-only` rejects legacy UI declarations before collecting requirements or
-  emitting previews. Preserve the default compatibility profile and both existing report formats;
-  this offline policy does not change Kubernetes admission.
+  Both profiles reject new UI through the delivered create schema; explicit `--profile api-only`
+  adds its earlier `InvalidUI` diagnostic. Preserve the default compatibility option and both
+  existing report formats, including historical saved reports. Offline create validation does not
+  predict update ratcheting.
 
 ## Validation
 
@@ -156,8 +159,8 @@ golangci-lint run --build-tags=browser ./internal/browser/...
 Workflow changes also require `actionlint` and `zizmor`.
 
 The required core job runs the `admission`-tagged migration checkpoint against
-checksum-pinned Kubernetes 1.35.0 and 1.37.0 envtest servers. Its candidate UI-field
-policy is test-only; keep the delivered CRD and runtime defaults unchanged. Local
+checksum-pinned Kubernetes 1.35.0 and 1.37.0 envtest servers. It upgrades the exact signed v8.0.0
+CRD to the delivered schema, retains the negative controls and restores the full released schema. Local
 runs require explicit owned binary assets and the matching version; see
 `docs/api-only-admission.md`. Never enable existing-cluster mode for this test.
 

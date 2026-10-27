@@ -14,9 +14,11 @@ session. See [API-only integration](adr/0023-api-only-product-integration.md) an
 
 ## Accepted compatibility metadata
 
-A legacy `spec.ui` or descriptor `ui` object may contain a public HTTPS URL, a title and a closed
-`contract` object. Versioned schema retirement is separate from runtime removal; do not reject or
-rewrite stored Kubernetes declarations solely to upgrade this runtime.
+An unchanged stored `spec.ui`, or a historical descriptor `ui` object, may contain a public HTTPS
+URL, a title and a closed `contract` object. The delivered Stage 1 schema rejects new UI declarations,
+additions and UI changes. Unrelated edits to an unchanged legacy object still work, and removing UI
+is allowed. Reintroducing it after removal is rejected. The field stays typed and no stored data is
+rewritten. Follow the [explicit CRD upgrade and rollback procedure](ui-admission-upgrade.md).
 
 - URLs follow the literal public HTTPS profile, with no credentials or fragments.
 - Titles are nonblank and contain at most 200 UTF-16 units; the standalone UI metadata limit is 16 KiB.

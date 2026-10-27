@@ -93,7 +93,7 @@ or establish live readiness.
 ## Results
 
 | Exit | Meaning                                                                     | Public previews             |
-|------|-----------------------------------------------------------------------------|-----------------------------|
+| ---- | --------------------------------------------------------------------------- | --------------------------- |
 | `0`  | Declarations passed; supplied dependencies were resolved                    | Present                     |
 | `1`  | Invalid declarations, exceeded limits, disabled feature, or command failure | Absent on an invalid report |
 | `2`  | Declarations passed, but a producer is absent from the local bundle         | Absent                      |
@@ -115,7 +115,7 @@ Source, Secret and workload references are omitted from the public projection.
 Select `--profile api-only` to catch legacy UI declarations before deploying a
 bundle. The profile rejects non-null `spec.ui` with `InvalidUI` and a fixed instruction
 to remove the declaration. Consumers own their interfaces and use named data outputs.
-The delivered schema still rejects `spec.ui: null`; omit the field entirely.
+The offline input decoder also rejects `spec.ui: null`; omit the field entirely.
 
 ```bash
 PUBLISHER_PREFLIGHT_ENABLED=true go run ./cmd/product-check \
@@ -124,17 +124,21 @@ PUBLISHER_PREFLIGHT_ENABLED=true go run ./cmd/product-check \
 go run docs/examples/preflight-client/main.go report.json
 ```
 
-The default `--profile compatibility` continues to validate supported legacy UI
-metadata. Both profiles use the same delivered schema, input and graph budgets,
-and report versions. API-only previews use the existing descriptor format without
+The default `--profile compatibility` follows the delivered create schema and also
+rejects new non-null `spec.ui`: v1 reports `AdmissionInvalid`; v2 reports
+`CrossFieldInvalid` at `/spec/ui`. The explicit API-only profile keeps its earlier
+`InvalidUI` remedy. Neither profile emits previews or a plan for rejected UI.
+Both profiles keep the same input and graph budgets and report versions. Existing
+saved reports containing bounded legacy UI remain readable. API-only previews use the existing descriptor format without
 UI metadata; current report readers need no migration. An API-only rejection contains no descriptor previews or plan, and never
 copies rejected UI values into diagnostics. Report contents do not attest which
 command options produced them; readers inspect declarations rather than certify
 the original input or a live deployment.
 
 This is an offline migration check behind the existing default-off preflight gate.
-It does not change Kubernetes admission, deployed resources, discovery or the retained
-compatibility runtime, and it establishes no live readiness or data access.
+It uses the same rule delivered for Kubernetes creates, but cannot predict update
+ratcheting and establishes no live readiness or data access. See the
+[Stage 1 upgrade procedure](ui-admission-upgrade.md) before updating a cluster.
 
 ## Review a selected bundle
 

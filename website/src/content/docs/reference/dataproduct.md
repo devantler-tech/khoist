@@ -14,7 +14,7 @@ kubectl explain dataproduct.spec --api-version=data.devantler.tech/v1alpha1
 ## Publisher fields
 
 | Field                                  | Purpose                                                      |
-|----------------------------------------|--------------------------------------------------------------|
+| -------------------------------------- | ------------------------------------------------------------ |
 | `metadata.name`, `metadata.namespace`  | Kubernetes lookup identity and namespace boundary            |
 | `spec.id`                              | Public absolute product identity                             |
 | `spec.name`, `spec.description`        | Human-readable public description                            |
@@ -34,5 +34,7 @@ Conditions distinguish aggregate readiness, source, connector, contract and comp
 observations. Inspect the generation and reason before acting.
 KHoist does not place records, credential values or database query results in status.
 
-Do not add `spec.ui` to new products. It is retained deprecated compatibility;
-consumer-owned applications integrate through the named output APIs.
+The delivered CRD rejects new, added or changed `spec.ui`. Unchanged legacy
+declarations can still be edited in unrelated fields or have UI removed; the field
+is not pruned from stored objects. Consumer-owned applications integrate through
+the named output APIs. See the [upgrade guide](/guides/upgrade/).
