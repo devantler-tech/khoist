@@ -79,7 +79,7 @@ publication_snapshot() {
 # chart_publication_lifecycle uses a separate metadata-only release; workload/query evidence remains in the general lifecycle.
 chart_publication_lifecycle() {
 	: "${candidate_chart:?packaged candidate required}"
-	local baseline_dir=$test_dir/publication-release revision allowance
+	local baseline_dir=$test_dir/publication-release revision allowance crd_uid
 	publication_helm list --all --filter '^dpc-publication$' --output json | jq -e 'length == 0' >/dev/null
 	publication_products_absent
 	allowance=$(publication_budget)
@@ -107,6 +107,12 @@ uiContract:
 uiAppearance:
   enabled: true
 YAML
+	# The historical v4 rollback reintroduces UI, which Stage 1 deliberately rejects.
+	# Run that older compatibility contract under the signed v8 schema in this owned
+	# fixture; the preceding latest-release lifecycle verifies the delivered policy.
+	# Keep all absence and signature/receipt guards before any schema mutation.
+	crd_uid=$(publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -er '.metadata.uid')
+	ui_admission_schema "$test_dir/ui-admission-release/release-chart.tgz" false "$crd_uid"
 	publication_kube get crd/dataproducts.data.devantler.tech -o json | jq -S '{uid:.metadata.uid,spec:.spec}' >"$test_dir/publication-original-crd.json"
 	# --skip-crds is essential: Helm handles crds/ separately from post-rendered templates.
 	publication_helm upgrade --install dpc-publication "$baseline_dir/release-chart.tgz" --reset-values \
@@ -131,5 +137,6 @@ YAML
 	publication_helm uninstall dpc-publication --wait --timeout 60s >/dev/null
 	publication_products_absent
 	installed_query_check
+	ui_admission_schema "$candidate_chart" true "$crd_uid"
 	echo 'PASS: signed v4 product metadata, real Helm UI removal, stored rollback, repeated removal, stable identities and fixture-only cleanup'
 }

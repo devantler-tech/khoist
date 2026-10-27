@@ -1,12 +1,12 @@
 # API-only admission checkpoint
 
-The `admission`-tagged acceptance runs the delivered DataProduct schema on an
-owned, disposable Kubernetes API server, then installs a test-only candidate
-policy. The candidate retains the typed `spec.ui` property and its existing
-validation and adds a rejecting CEL rule at that field. Unchanged legacy UI
-metadata can ratchet through unrelated edits; new or changed UI is rejected.
-The delivered CRD, served/storage version, controller and feature defaults are
-unchanged by this checkpoint.
+The `admission`-tagged acceptance starts with the exact CRD extracted from the
+signed v8.0.0 chart on an owned, disposable Kubernetes API server, then applies
+the delivered schema. The delivered CRD retains the typed `spec.ui` property and
+its existing validation, with a rejecting CEL rule at that field. Unchanged legacy UI
+metadata can ratchet through unrelated edits; new or changed UI is rejected with
+`API-only products do not support spec.ui; remove it`. The sole served/storage
+version remains `v1alpha1`; feature defaults and stored objects are unchanged.
 
 Required CI exercises checksum-pinned Kubernetes **1.35.0** and **1.37.0** envtest
 assets, covering the chart's minimum version and the current upper admission
@@ -52,10 +52,24 @@ process groups. Hosted-runner disposal is the backstop for a test alarm, an
 unresponsive bootstrap binary or uncatchable process termination; the outer
 command timeout alone does not prove child-process cleanup.
 
-This is admission-migration evidence, not production activation, a versioned
-contract change, compatibility-runtime retirement or independent adoption.
+The required source lifecycle separately verifies the signed v8.0.0 image and
+chart, installs that release, applies the candidate CRD explicitly, upgrades the
+workloads, performs a real Helm rollback and restores the candidate. A stored
+legacy UI declaration retains its UID, full specification and status; current
+readiness and source queries must work at every phase. Helm rollback leaves the
+rejecting rule installed. The older v4/v5 metadata rollback tests run under the
+signed v8 schema because they intentionally reintroduce UI; they restore the
+delivered schema afterwards and do not stand in for Stage 1 admission proof.
+
+The CRD-only step preserves the complete stored status exactly. During real
+workload rollouts, condition transition timestamps may advance as availability
+changes; every other status value remains equal, timestamps stay valid and do
+not move backwards from the preceding phase, and readiness must reflect the
+current generation. Complete status observations are retained alongside the comparison.
+
+This is admission-migration evidence, not production activation or independent adoption.
 [ADR 0024](adr/0024-retire-legacy-ui-declaration-within-v1alpha1.md) records how
-this rule becomes the delivered first stage of the field's removal. That work and
+this rule is the delivered first stage of the field's removal. Field removal and
 signed Platform rollout remain in
 [#392](https://github.com/devantler-tech/khoist/issues/392) and
 [platform#4890](https://github.com/devantler-tech/platform/issues/4890).

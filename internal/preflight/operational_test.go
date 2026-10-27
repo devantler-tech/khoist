@@ -3,15 +3,15 @@ package preflight
 import (
 	"encoding/json"
 	"io"
-	"reflect"
 	"strings"
 	"testing"
 
 	data "github.com/devantler-tech/data-product-controller/api/v1alpha1"
 )
 
-// TestLegacyUIMetadataRequiresNoRuntimeGates keeps bounded metadata inert after retirement.
-func TestLegacyUIMetadataRequiresNoRuntimeGates(t *testing.T) {
+// TestRetiredUIRequestsNoRuntimeGates rejects every new UI declaration without
+// suggesting that enabling the retired runtime would admit it.
+func TestRetiredUIRequestsNoRuntimeGates(t *testing.T) {
 	for _, version := range []string{"data-product-ui/v1", "data-product-ui/v2"} {
 		for _, caps := range [][]data.UICapability{{}, {"status"}, {"appearance"}} {
 			p := product("ui")
@@ -24,36 +24,27 @@ func TestLegacyUIMetadataRequiresNoRuntimeGates(t *testing.T) {
 					Capabilities: caps,
 				},
 			}
-			want := []string{}
 			wire := bundle(t, p)
 			legacy := Check(t.Context(), strings.NewReader(wire), "")
 			current := CheckBundle(t.Context(), []io.Reader{strings.NewReader(wire)}, "")
-			if version == "data-product-ui/v1" &&
-				reflect.DeepEqual(caps, []data.UICapability{"appearance"}) {
-				if legacy.Valid || current.Valid {
-					t.Fatal("v1 appearance bypassed publication admission")
-				}
-				continue
-			}
-			if !legacy.Valid || !legacy.Complete || !current.Valid || !current.Complete ||
-				len(current.Descriptors) != 1 {
+			if legacy.Valid || legacy.Complete || current.Valid || current.Complete ||
+				len(
+					legacy.Descriptors,
+				) != 0 || len(current.Descriptors) != 0 || current.Plan != nil {
 				t.Fatalf(
-					"valid declaration lost complete preview: legacy=%+v current=%+v",
+					"retired UI declaration produced a preview: legacy=%+v current=%+v",
 					legacy,
 					current,
 				)
 			}
-			if !reflect.DeepEqual(legacy.RequiredFeatures, want) ||
-				!reflect.DeepEqual(current.RequiredFeatures, want) ||
-				len(current.ProductFeatures) != 1 ||
-				!reflect.DeepEqual(current.ProductFeatures[0].RequiredFeatures, want) {
+			if len(legacy.RequiredFeatures) != 0 || len(current.RequiredFeatures) != 0 ||
+				len(current.ProductFeatures) != 0 {
 				t.Errorf(
-					"%s %v: requirements=%v per-product=%v want=%v",
+					"%s %v: rejected UI requested requirements=%v per-product=%v",
 					version,
 					caps,
 					current.RequiredFeatures,
 					current.ProductFeatures,
-					want,
 				)
 			}
 		}

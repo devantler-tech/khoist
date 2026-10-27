@@ -202,17 +202,8 @@ func TestIndependentPublisherReportReader(t *testing.T) {
 		t.Run(label, func(t *testing.T) { read(t, []byte(wire), true) })
 	}
 	for _, version := range []string{"data-product-ui/v1", "data-product-ui/v2"} {
-		p := product("with-ui")
-		p.Spec.UI = &data.ProductUI{
-			URL:   "https://ui.example.test/view",
-			Title: "Product",
-			Contract: &data.UIContract{
-				APIVersion:   version,
-				HostOrigins:  []data.UIHostOrigin{"https://host.example.test"},
-				Capabilities: []data.UICapability{},
-			},
-		}
-		report := selected(t, bundle(t, p))
+		// Import real saved v8 reports: new declarations no longer pass admission.
+		report := historicalUIReport(t, strings.TrimPrefix(version, "data-product-ui/"))
 		original, err := json.Marshal(report)
 		if err != nil {
 			t.Fatal(err)

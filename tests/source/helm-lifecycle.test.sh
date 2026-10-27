@@ -237,6 +237,7 @@ candidate_chart=$test_dir/candidate.tgz
 integration_deadline=$((SECONDS + 60))
 source "$repo_root/tests/source/chart-publication.sh"
 source "$repo_root/tests/source/helm-lifecycle.sh"
+source "$repo_root/tests/source/ui-admission-lifecycle.sh"
 source "$repo_root/tests/source/installed-matrix.sh"
 # The verified receipt is supplied at the external verifier boundary; consumption remains real.
 bash() {
@@ -396,3 +397,77 @@ for fault in stored-ui live-ui changed-output recreated-product changed-owner ch
 	}
 done
 echo 'UI-free stored/live snapshot controls reject legacy UI, changed outputs, replacement UIDs, ownership drift and incomplete reads'
+
+# A real workload rollout may advance condition transition times. Preserve every
+# other status value, and require exact status bytes for a schema-only change.
+jq -n '{metadata:{uid:"stage1-product",generation:2},
+  spec:{ui:{url:"https://data.example.com/legacy",title:"Legacy admission fixture"},name:"Retained product"},
+  status:{observedGeneration:2,conditions:[
+    {type:"Ready",status:"True",reason:"Ready",message:"Ready",observedGeneration:2,lastTransitionTime:"2026-10-27T07:00:00Z"},
+    {type:"ConnectorReady",status:"True",reason:"Available",message:"Available",observedGeneration:2,lastTransitionTime:"2026-10-27T07:00:00Z"}]}}' \
+	>"$work/stage1-before.json"
+cat >"$work/stage1-snapshot-check.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root=$PUBLICATION_TEST_ROOT
+test_dir=$PUBLICATION_TEST_WORK/stage1-snapshot
+mkdir -p "$test_dir"
+source "$repo_root/tests/source/ui-admission-lifecycle.sh"
+selection=before
+publication_kube() {
+ [[ "$*" == 'get dataproduct existing-export -o json' ]] || return 99
+ cat "$PUBLICATION_TEST_WORK/stage1-$selection.json"
+}
+ui_admission_product_snapshot baseline
+if [[ $1 == rollback || $1 == restored ]]; then
+ selection=previous
+ ui_admission_product_snapshot candidate
+ [[ $1 != restored ]] || ui_admission_product_snapshot rollback
+fi
+selection=after
+ui_admission_product_snapshot "$1"
+EOF
+for phase in candidate rollback restored after-crd-apply; do
+	for fault in unchanged later-time reordered earlier-time invalid-time lost-status changed-status changed-reason changed-message stale-generation lost-condition changed-spec changed-ui replaced-product regressed-since-predecessor later-than-predecessor; do
+		cp "$work/stage1-before.json" "$work/stage1-previous.json"
+		case $fault in
+		unchanged) cp "$work/stage1-before.json" "$work/stage1-after.json" ;;
+		later-time) jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:01:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		reordered) jq '.status.conditions|=reverse' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		earlier-time) jq '(.status.conditions[].lastTransitionTime)="2026-10-27T06:59:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		invalid-time) jq '.status.conditions[0].lastTransitionTime="unknown"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		lost-status) jq 'del(.status)' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		changed-status) jq '.status.conditions[0].status="False"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		changed-reason) jq '.status.conditions[0].reason="Unobserved"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		changed-message) jq '.status.conditions[0].message="Lost original status"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		stale-generation) jq '.status.conditions[0].observedGeneration=1' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		lost-condition) jq '.status.conditions|=.[0:1]' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		changed-spec) jq '.spec.name="Changed product"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		changed-ui) jq '.spec.ui.title="Changed UI"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		replaced-product) jq '.metadata.uid="replacement"' "$work/stage1-before.json" >"$work/stage1-after.json" ;;
+		regressed-since-predecessor | later-than-predecessor)
+			[[ $phase == rollback || $phase == restored ]] || continue
+			jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:02:00Z"' "$work/stage1-before.json" >"$work/stage1-previous.json"
+			jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:01:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json"
+			if [[ $fault == later-than-predecessor ]]; then
+				jq '(.status.conditions[].lastTransitionTime)="2026-10-27T07:03:00Z"' "$work/stage1-before.json" >"$work/stage1-after.json"
+			fi
+			;;
+		esac
+		result=0
+		"$BASH" "$work/stage1-snapshot-check.sh" "$phase" >"$work/stage1-snapshot.log" 2>&1 || result=$?
+		if [[ $fault == unchanged || $fault == later-than-predecessor || ($phase != after-crd-apply && ($fault == later-time || $fault == reordered)) ]]; then
+			[[ $result == 0 ]] || {
+				echo "Stage 1 snapshot rejected valid $phase state: $fault (exit $result)" >&2
+				cat "$work/stage1-snapshot.log" >&2
+				exit 1
+			}
+		else
+			[[ $result != 0 && $result != 99 ]] || {
+				echo "Stage 1 snapshot accepted invalid $phase state: $fault (exit $result)" >&2
+				exit 1
+			}
+		fi
+	done
+done
+echo 'Stage 1 snapshots preserve identity/spec/status, allow only valid forward rollout times, and keep schema-only status exact'

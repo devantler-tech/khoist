@@ -21,7 +21,7 @@ owns the product.
 
 ## Try it locally
 
-The repository includes an example data product, *Harbour observations*, that serves two fixed,
+The repository includes an example data product, _Harbour observations_, that serves two fixed,
 made-up measurements and the description of its API. The measurements are built
 into the program; it reads no external source. Running it shows what a product publishes. It does not run the controller or the registry, and it needs no Kubernetes
 cluster, account or credentials.
@@ -58,7 +58,22 @@ curl http://127.0.0.1:8080/api/observations
 It answers with the two sample measurements:
 
 ```json
-{"items":[{"station":"nordhavn","temperatureCelsius":16.8,"salinityPsu":14.2,"observedAt":"2026-08-29T12:00:00Z"},{"station":"refshaleoen","temperatureCelsius":17.1,"salinityPsu":13.9,"observedAt":"2026-08-29T12:05:00Z"}]}
+{
+  "items": [
+    {
+      "station": "nordhavn",
+      "temperatureCelsius": 16.8,
+      "salinityPsu": 14.2,
+      "observedAt": "2026-08-29T12:00:00Z"
+    },
+    {
+      "station": "refshaleoen",
+      "temperatureCelsius": 17.1,
+      "salinityPsu": 13.9,
+      "observedAt": "2026-08-29T12:05:00Z"
+    }
+  ]
+}
 ```
 
 Filter the API response with `curl "http://127.0.0.1:8080/api/observations?station=nordhavn"`.
@@ -168,11 +183,12 @@ HTTPS interface links. Its browser policy denies frames and permits connections
 only to its own API. It passes no bearer token, Secret or Kubernetes identity to
 publishers, and never imports their JavaScript.
 
-The chart publishes API interfaces without `spec.ui`. Existing hand-authored legacy UI and
-descriptor fields remain bounded compatibility metadata, with [their constraints documented here](docs/ui-contract.md).
+The chart publishes API interfaces without `spec.ui`. The delivered CRD rejects new UI declarations
+and changes, while unchanged legacy declarations remain removable. Historical descriptor fields
+remain readable; follow the [Stage 1 upgrade guide](docs/ui-admission-upgrade.md) when updating a cluster.
 The product-session runtime and its activation flags are absent. The independent
 [publisher-review application](docs/publisher-preflight.md) remains available; existing `/ui-kit`
-deployments serve only that application under its own gate. Versioned metadata retirement and
+deployments serve only that application under its own gate. Later field removal and
 normal Platform adoption remain tracked in [#390](https://github.com/devantler-tech/khoist/issues/390).
 
 The workspace offers System, Light and Dark appearance with an orange accent.

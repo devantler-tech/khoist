@@ -25,6 +25,14 @@ helm show crds oci://ghcr.io/devantler-tech/charts/khoist \
 The API is `v1alpha1`. Do not remove fields, downgrade a schema or delete the CRD
 as a troubleshooting shortcut. A workload rollback does not roll back the CRD.
 
+The Stage 1 UI retirement keeps the field typed but rejects new, added or changed
+`spec.ui`. Unchanged legacy declarations survive unrelated edits and can be
+removed. After applying this release's CRD, read it back and verify the rejecting
+rule at `spec.ui` and the unchanged `[v1alpha1]` stored version. Restoring UI writes
+requires explicitly applying the previous verified release's full CRD; a Helm
+rollback alone keeps the newer rejection policy. Follow the
+[Stage 1 upgrade and recovery procedure](https://github.com/devantler-tech/khoist/blob/3d54a180f108b62e2eaf8c42a7d6e253456fe3ed/docs/ui-admission-upgrade.md).
+
 ## Upgrade workloads
 
 Use the selected new version and verified digest with your reviewed operator values:

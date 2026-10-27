@@ -318,8 +318,8 @@ func TestPublicPublicationProfile(t *testing.T) {
 			p.Spec.Outputs[0].MediaType = strings.Repeat("x", 16000)
 			p.Spec.Outputs[0].ContractURL = "https://api.example.test/" + strings.Repeat("x", 16000)
 		}},
-		{"blank UI title", "InvalidUI", func(p *data.DataProduct) { p.Spec.UI = &data.ProductUI{URL: "https://ui.example.test", Title: "   "} }},
-		{"noncanonical origin", "InvalidUI", func(p *data.DataProduct) {
+		{"retired UI with blank title", "AdmissionInvalid", func(p *data.DataProduct) { p.Spec.UI = &data.ProductUI{URL: "https://ui.example.test", Title: "   "} }},
+		{"retired UI with noncanonical origin", "AdmissionInvalid", func(p *data.DataProduct) {
 			p.Spec.UI = &data.ProductUI{URL: "https://ui.example.test", Title: "Explore", Contract: &data.UIContract{APIVersion: "data-product-ui/v2", HostOrigins: []data.UIHostOrigin{"https://host.example.test:443"}, Capabilities: []data.UICapability{"status"}}}
 		}},
 	} {
