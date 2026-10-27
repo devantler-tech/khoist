@@ -61,6 +61,12 @@ rejecting rule installed. The older v4/v5 metadata rollback tests run under the
 signed v8 schema because they intentionally reintroduce UI; they restore the
 delivered schema afterwards and do not stand in for Stage 1 admission proof.
 
+The CRD-only step preserves the complete stored status exactly. During real
+workload rollouts, condition transition timestamps may advance as availability
+changes; every other status value remains equal, timestamps stay valid and do
+not move backwards, and readiness must reflect the current generation. Complete
+status observations are retained alongside the comparison.
+
 This is admission-migration evidence, not production activation or independent adoption.
 [ADR 0024](adr/0024-retire-legacy-ui-declaration-within-v1alpha1.md) records how
 this rule is the delivered first stage of the field's removal. Field removal and

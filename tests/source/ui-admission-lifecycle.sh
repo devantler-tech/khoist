@@ -19,17 +19,33 @@ ui_admission_schema() {
           .rule == "false" and .message == "API-only products do not support spec.ui; remove it")) == $rejecting))' >/dev/null
 }
 
-# ui_admission_product_snapshot compares stored legacy data, including its status, across real workload revisions.
+# ui_admission_product_snapshot preserves status content while real rollout transition clocks may advance.
 ui_admission_product_snapshot() {
 	local phase=$1
 	publication_kube get dataproduct existing-export -o json | jq -Se '
-    select(.metadata.uid != "" and .metadata.deletionTimestamp == null and
+    . as $product |
+    select((.metadata.uid | type == "string" and length > 0) and .metadata.deletionTimestamp == null and
       .spec.ui.url == "https://data.example.com/legacy" and
       .spec.ui.title == "Legacy admission fixture" and
-      (.status.conditions | length > 0)) |
-    {uid:.metadata.uid,spec:.spec,status:.status}' >"$test_dir/ui-admission-$phase-product.json"
-	if [[ $phase != baseline ]]; then
+      .status.observedGeneration == .metadata.generation and
+      any(.status.conditions[]; .type == "Ready" and .status == "True") and
+      any(.status.conditions[]; .type == "ConnectorReady" and .status == "True") and
+      all(.status.conditions[]; .observedGeneration == $product.metadata.generation and
+        (.lastTransitionTime | fromdateiso8601 | type == "number"))) |
+    {uid:.metadata.uid,spec:.spec,status:.status}' >"$test_dir/ui-admission-$phase-raw-product.json"
+	# Keep the complete observation. Only the comparison permits transition clocks
+	# to advance when actual workload rollouts temporarily change availability.
+	jq -S '.status.conditions |= (sort_by(.type) | map(del(.lastTransitionTime)))' \
+		"$test_dir/ui-admission-$phase-raw-product.json" >"$test_dir/ui-admission-$phase-product.json"
+	if [[ $phase == after-crd-apply ]]; then
+		cmp "$test_dir/ui-admission-baseline-raw-product.json" "$test_dir/ui-admission-$phase-raw-product.json"
+	elif [[ $phase != baseline ]]; then
 		cmp "$test_dir/ui-admission-baseline-product.json" "$test_dir/ui-admission-$phase-product.json"
+		jq -e --slurpfile before "$test_dir/ui-admission-baseline-raw-product.json" '
+      . as $after | all($before[0].status.conditions[]; . as $old |
+        any($after.status.conditions[]; .type == $old.type and
+          (.lastTransitionTime | fromdateiso8601) >= ($old.lastTransitionTime | fromdateiso8601)))' \
+			"$test_dir/ui-admission-$phase-raw-product.json" >/dev/null
 	fi
 }
 
