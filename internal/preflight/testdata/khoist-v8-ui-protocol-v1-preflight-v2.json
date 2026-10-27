@@ -1,1 +1,78 @@
-{"apiVersion":"data-product-preflight/v2","valid":true,"complete":true,"products":1,"sources":[{"source":1,"documents":1,"products":1}],"requiredFeatures":[],"productFeatures":[{"source":1,"document":1,"requiredFeatures":[]}],"diagnostics":[],"diagnosticCounts":{"total":0,"errors":0,"warnings":0,"omitted":0},"descriptors":[{"apiVersion":"data-product-descriptor/v1","kind":"DataProduct","namespace":"products","name":"with-ui","id":"urn:example:with-ui","displayName":"Example","description":"Public observations","version":"v1.0.0","owner":{"name":"Example team"},"outputs":[{"name":"observations","protocol":"OpenAPI","url":"https://api.example.test/observations","contractUrl":"https://api.example.test/openapi.json"}],"ui":{"url":"https://ui.example.test/view","title":"øøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøø","contract":{"apiVersion":"data-product-ui/v1","hostOrigins":["https://host.example.test"],"capabilities":[]}},"ready":false,"readiness":{"reason":"unobserved","message":"No conclusive independent observation is available for this capability."},"generation":0,"observedGeneration":0,"health":{"composition":{"state":"not-applicable","message":"This product does not declare this capability.","generation":0,"observedGeneration":0},"connector":{"state":"not-applicable","message":"This product does not declare this capability.","generation":0,"observedGeneration":0},"contracts":{"state":"not-applicable","message":"This product does not declare this capability.","generation":0,"observedGeneration":0},"source":{"state":"not-applicable","message":"This product does not declare this capability.","generation":0,"observedGeneration":0}}}],"plan":{"order":[{"key":"products/with-ui","source":1,"document":1}],"edges":[]}}
+{
+  "apiVersion": "data-product-preflight/v2",
+  "valid": true,
+  "complete": true,
+  "products": 1,
+  "sources": [{ "source": 1, "documents": 1, "products": 1 }],
+  "requiredFeatures": [],
+  "productFeatures": [{ "source": 1, "document": 1, "requiredFeatures": [] }],
+  "diagnostics": [],
+  "diagnosticCounts": { "total": 0, "errors": 0, "warnings": 0, "omitted": 0 },
+  "descriptors": [
+    {
+      "apiVersion": "data-product-descriptor/v1",
+      "kind": "DataProduct",
+      "namespace": "products",
+      "name": "with-ui",
+      "id": "urn:example:with-ui",
+      "displayName": "Example",
+      "description": "Public observations",
+      "version": "v1.0.0",
+      "owner": { "name": "Example team" },
+      "outputs": [
+        {
+          "name": "observations",
+          "protocol": "OpenAPI",
+          "url": "https://api.example.test/observations",
+          "contractUrl": "https://api.example.test/openapi.json"
+        }
+      ],
+      "ui": {
+        "url": "https://ui.example.test/view",
+        "title": "øøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøøø",
+        "contract": {
+          "apiVersion": "data-product-ui/v1",
+          "hostOrigins": ["https://host.example.test"],
+          "capabilities": []
+        }
+      },
+      "ready": false,
+      "readiness": {
+        "reason": "unobserved",
+        "message": "No conclusive independent observation is available for this capability."
+      },
+      "generation": 0,
+      "observedGeneration": 0,
+      "health": {
+        "composition": {
+          "state": "not-applicable",
+          "message": "This product does not declare this capability.",
+          "generation": 0,
+          "observedGeneration": 0
+        },
+        "connector": {
+          "state": "not-applicable",
+          "message": "This product does not declare this capability.",
+          "generation": 0,
+          "observedGeneration": 0
+        },
+        "contracts": {
+          "state": "not-applicable",
+          "message": "This product does not declare this capability.",
+          "generation": 0,
+          "observedGeneration": 0
+        },
+        "source": {
+          "state": "not-applicable",
+          "message": "This product does not declare this capability.",
+          "generation": 0,
+          "observedGeneration": 0
+        }
+      }
+    }
+  ],
+  "plan": {
+    "order": [{ "key": "products/with-ui", "source": 1, "document": 1 }],
+    "edges": []
+  }
+}
