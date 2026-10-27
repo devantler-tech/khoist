@@ -64,9 +64,9 @@ func discoveryFixture(t *testing.T) (*httptest.Server, *atomic.Bool, *atomic.Int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/api/v1/ui-config":
+		case r.URL.Path == "/api/v1/workspace-config":
 			_ = json.NewEncoder(w).
-				Encode(map[string]any{"discoveryEnabled": true, "uiContractEnabled": false, "uiAppearanceEnabled": false})
+				Encode(map[string]any{"discoveryEnabled": true})
 		case r.URL.Path == "/api/v2/products":
 			if code := catalogStatus.Load(); code != 0 {
 				http.Error(w, "catalog unavailable", int(code))
@@ -111,7 +111,7 @@ func TestDiscoveryReportsRejectedProducts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/api/v1/ui-config":
+		case "/api/v1/workspace-config":
 			_ = json.NewEncoder(w).Encode(map[string]any{"discoveryEnabled": true})
 		case "/api/v2/products":
 			page := map[string]any{

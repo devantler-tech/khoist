@@ -3,7 +3,6 @@
 package browser_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -76,10 +75,7 @@ func TestAuthenticatedWorkspace(t *testing.T) {
 				t.Fatal(err)
 			}
 			reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(published).Build()
-			registryHandler = registry.NewHandlerWithOptions(reader, registry.HandlerOptions{
-				ContractEnabled:   func(context.Context) bool { return true },
-				AppearanceEnabled: func(context.Context) bool { return appearance },
-			})
+			registryHandler = registry.NewHandler(reader)
 			var err error
 			productHandler, err = demoproduct.NewHandlerWithOptions(demoproduct.HandlerOptions{
 				PublicBaseURL: productOrigin,
@@ -91,7 +87,7 @@ func TestAuthenticatedWorkspace(t *testing.T) {
 			request := httptest.NewRequestWithContext(
 				t.Context(),
 				http.MethodGet,
-				"/api/v1/ui-config",
+				"/api/v1/workspace-config",
 				nil,
 			)
 			recorder := httptest.NewRecorder()

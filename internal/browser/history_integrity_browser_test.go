@@ -34,7 +34,7 @@ func TestRegistryHistoryRevocation(t *testing.T) {
 		)
 	}
 	// Selected product metadata and retained traces obey the same document boundary.
-	selected, _ := themeWorkspace(t, false, true, true, true)
+	selected, _ := themeWorkspace(t, false)
 	selected.MustElement(".product-card").MustClick()
 	selected.MustElement("#product-owner").MustWait(`()=>this.textContent==='Harbour team'`)
 	selected.MustEval(`()=>dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}))`)

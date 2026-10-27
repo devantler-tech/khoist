@@ -3,8 +3,6 @@
 package browser_test
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -23,7 +21,7 @@ import (
 
 // TestWorkspaceThemes changes local appearance without losing selected metadata or contacting a publisher.
 func TestWorkspaceThemes(t *testing.T) {
-	page, loads := themeWorkspace(t, false, true, true, true)
+	page, loads := themeWorkspace(t, false)
 	if !page.MustEval(`() => !!document.querySelector('select[aria-label="Theme"]')`).Bool() {
 		t.Fatal("workspace has no accessible theme selector")
 	}
@@ -54,7 +52,7 @@ func TestWorkspaceThemes(t *testing.T) {
 
 // TestSystemThemeWithDeniedStorage follows preference changes even when browser storage is unavailable.
 func TestSystemThemeWithDeniedStorage(t *testing.T) {
-	page, _ := themeWorkspace(t, true, true, true, true)
+	page, _ := themeWorkspace(t, true)
 	page.MustElement(".product-card").MustClick()
 	page.MustElement("#product-owner").MustWait(`() => this.textContent === 'Harbour team'`)
 	for _, theme := range []struct{ preference, background string }{{"dark", "rgb(0, 0, 0)"}, {"light", "rgb(255, 255, 255)"}} {
@@ -78,30 +76,6 @@ func TestSystemThemeWithDeniedStorage(t *testing.T) {
 	waitTheme(t, page, background)
 }
 
-// TestAppearanceGates proves legacy presentation flags cannot restore registry execution.
-func TestAppearanceGates(t *testing.T) {
-	for _, gates := range []struct{ contract, appearance bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
-		t.Run(
-			fmt.Sprintf("contract=%t/appearance=%t", gates.contract, gates.appearance),
-			func(t *testing.T) {
-				page, loads := themeWorkspace(
-					t,
-					false,
-					gates.contract,
-					gates.appearance,
-					gates.contract && gates.appearance,
-				)
-				page.MustElement(".product-card").MustClick()
-				page.MustElement("#product-owner").
-					MustWait(`() => this.textContent === 'Harbour team'`)
-				if loads.Load() != 0 || len(page.MustElements("iframe")) != 0 {
-					t.Fatal("legacy appearance flags restored a product frame")
-				}
-			},
-		)
-	}
-}
-
 // waitTheme observes the workspace's actual palette rather than a theme attribute.
 func waitTheme(t *testing.T, page *rod.Page, background string) {
 	t.Helper()
@@ -112,7 +86,7 @@ func waitTheme(t *testing.T, page *rod.Page, background string) {
 // themeWorkspace serves independently owned product metadata without registry execution.
 func themeWorkspace(
 	t *testing.T,
-	deniedStorage, contractEnabled, appearanceEnabled, _ bool,
+	deniedStorage bool,
 ) (*rod.Page, *atomic.Int32) {
 	t.Helper()
 	var loads atomic.Int32
@@ -142,10 +116,7 @@ func themeWorkspace(
 		Capabilities: []datav1alpha1.UICapability{"status", "resize", "appearance"},
 	}
 	reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(published).Build()
-	registryHandler = registry.NewHandlerWithOptions(reader, registry.HandlerOptions{
-		ContractEnabled:   func(context.Context) bool { return contractEnabled },
-		AppearanceEnabled: func(context.Context) bool { return appearanceEnabled },
-	})
+	registryHandler = registry.NewHandler(reader)
 	var err error
 	handler, err = demoproduct.NewHandlerWithOptions(demoproduct.HandlerOptions{
 		PublicBaseURL: product.URL,

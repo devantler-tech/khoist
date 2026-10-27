@@ -85,8 +85,9 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   redirect rejection, local-only filters, refresh/navigation cancellation and public-source CSP.
   The controller and workload never read release data, and no presentation messages reach a parent.
   Workload readiness does not establish GitHub availability. See `docs/ksail-releases.md`.
-- Legacy UI metadata remains bounded and validated until its versioned retirement. The registry's
-  presentation configuration keys remain false. No runtime evaluates `ui-contract` or `ui-appearance`;
+- Legacy UI declarations remain bounded and validated in the CRD and compatible publisher reports
+  until their versioned retirement. Registry responses omit them; workspace configuration exposes
+  only discovery and lineage capabilities. No runtime evaluates `ui-contract` or `ui-appearance`;
   product-session assets, grants and messaging are absent. Preserve the independent publisher-review
   application, inert metadata validators and old `/ui-kit` publisher entrypoint until consuming
   deployments switch. See `docs/ui-contract.md` and ADR 0023.

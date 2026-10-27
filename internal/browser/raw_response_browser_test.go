@@ -101,10 +101,10 @@ func TestRegistryRawResponseAdmission(t *testing.T) {
 							http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 								w.Header().Set("Content-Type", "application/json")
 								switch req.URL.Path {
-								case "/api/v1/ui-config":
+								case "/api/v1/workspace-config":
 									_, _ = fmt.Fprintf(
 										w,
-										`{"discoveryEnabled":%t,"uiContractEnabled":false,"uiAppearanceEnabled":false}`,
+										`{"discoveryEnabled":%t}`,
 										discovery,
 									)
 								case "/api/v1/products", "/api/v2/products":

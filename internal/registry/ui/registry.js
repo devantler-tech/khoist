@@ -454,7 +454,7 @@ async function loadProducts() {
   count.textContent = "Loading…";
   status.textContent = "Loading products…";
   try {
-    const configurationResponse = await fetch("/api/v1/ui-config", {cache: "no-store", signal: signal(5000)});
+    const configurationResponse = await fetch("/api/v1/workspace-config", {cache: "no-store", signal: signal(5000)});
     const configuration = configurationResponse.ok ? await boundedJSON(configurationResponse, 4096) : {};
     if (request !== inventoryRequest) return;
     discoveryEnabled = configuration.discoveryEnabled === true;
