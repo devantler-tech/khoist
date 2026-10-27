@@ -90,7 +90,11 @@ probe() { kube exec consumer -- /fixture probe --timeout 10s "$@"; }
 registry_ready() { probe --url http://dpc/api/v1/products --registry-product "products/${2:-existing-export}" --registry-ready "$1"; }
 # Probe every endpoint directly: a successful Service request can hide a non-serving follower.
 registry_replicas_ready() {
-	local addresses address expected_title=${1:-KHoist}
+	local addresses address expected_title=${1:-KHoist} configuration_profile=${2:-workspace}
+	case $configuration_profile in
+	legacy | workspace) ;;
+	*) return 1 ;;
+	esac
 	kube get deployment/dpc -o json >"$test_dir/registry-deployment.json" || return 1
 	kube get replicasets -o json >"$test_dir/registry-replicasets.json" || return 1
 	addresses=$(kube get pods -l app.kubernetes.io/component=controller -o json |
@@ -110,7 +114,12 @@ registry_replicas_ready() {
 	while IFS= read -r address; do
 		probe --url "http://$address:8082/api/v1/products" --contains '"products":' || return 1
 		probe --url "http://$address:8082/" --contains "<title>$expected_title</title>" || return 1
-		probe --url "http://$address:8082/api/v1/ui-config" --contains '"uiContractEnabled":false,"uiAppearanceEnabled":false' || return 1
+		if [[ $configuration_profile == legacy ]]; then
+			probe --url "http://$address:8082/api/v1/ui-config" --contains '"uiContractEnabled":false,"uiAppearanceEnabled":false' || return 1
+		else
+			probe --url "http://$address:8082/api/v1/ui-config" --want-status 404 || return 1
+			probe --url "http://$address:8082/api/v1/workspace-config" --contains '"discoveryEnabled":false,"lineageEnabled":false' || return 1
+		fi
 	done <<<"$addresses"
 }
 # conditions requires both connector and aggregate conditions to match the product's current generation.

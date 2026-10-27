@@ -5,7 +5,8 @@
 
 kube get deployment dpc -o json | jq -e 'all(.spec.template.spec.containers[]; all((.env // [])[]; (.name != "UI_CONTRACT_ENABLED" and .name != "UI_APPEARANCE_ENABLED" and .name != "UI_HOST_ORIGINS")))' >/dev/null
 probe --url http://dpc/assets/ui-contract.js --want-status 404
-probe --url http://dpc/api/v1/ui-config --contains '"uiContractEnabled":false,"uiAppearanceEnabled":false'
+probe --url http://dpc/api/v1/ui-config --want-status 404
+probe --url http://dpc/api/v1/workspace-config --contains '"discoveryEnabled":false,"lineageEnabled":false'
 echo 'PASS: installed controller exposes no presentation runtime or operator grants'
 
 yq -o=json '.' "$repo_root/docs/examples/http-source-product.yaml" |

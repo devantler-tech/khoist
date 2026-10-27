@@ -31,7 +31,7 @@ func catalogWireFixture(
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.URL.Path == "/api/v1/ui-config":
+		case r.URL.Path == "/api/v1/workspace-config":
 			_, _ = w.Write([]byte(`{"discoveryEnabled":true}`))
 		case strings.HasPrefix(r.URL.Path, "/api/v2/products"):
 			serve(w, r)

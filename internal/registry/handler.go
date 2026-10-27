@@ -21,12 +21,6 @@ var uiFiles embed.FS
 
 // HandlerOptions controls registry discovery and declared input compatibility.
 type HandlerOptions struct {
-	// ContractEnabled is an ignored legacy callback retained for compatibility testing.
-	// The API-only registry never evaluates it or grants product UI capabilities.
-	ContractEnabled func(context.Context) bool
-	// AppearanceEnabled is an ignored legacy callback retained for compatibility testing.
-	// Workspace appearance is local and grants no product capability.
-	AppearanceEnabled  func(context.Context) bool
 	DiscoveryEnabled   func(context.Context) bool
 	LineageEnabled     func(context.Context) bool
 	InputCompatibility func(datav1alpha1.InputPort, *datav1alpha1.DataProduct) string
@@ -76,7 +70,8 @@ func NewHandlerWithOptions(reader client.Reader, options HandlerOptions) http.Ha
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/products", server.listProducts)
-	mux.HandleFunc("GET /api/v1/ui-config", server.uiConfig)
+	mux.HandleFunc("GET /api/v1/workspace-config", server.workspaceConfig)
+	mux.HandleFunc("GET /api/v1/", http.NotFound)
 	mux.HandleFunc("GET /api/v2/products", server.discoveryProducts)
 	mux.HandleFunc("GET /api/v2/products/{namespace}/{name}", server.discoveryProduct)
 	mux.HandleFunc("GET /api/v2/products/{namespace}/{name}/lineage", server.productLineage)
@@ -88,15 +83,13 @@ func NewHandlerWithOptions(reader client.Reader, options HandlerOptions) http.Ha
 	return mux
 }
 
-// uiConfig advertises only current release capability, never user or credential context.
-func (s *server) uiConfig(writer http.ResponseWriter, request *http.Request) {
+// workspaceConfig advertises metadata capabilities, never product presentation grants.
+func (s *server) workspaceConfig(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(writer).Encode(struct {
-		UIContractEnabled   bool `json:"uiContractEnabled"`
-		UIAppearanceEnabled bool `json:"uiAppearanceEnabled"`
-		DiscoveryEnabled    bool `json:"discoveryEnabled"`
-		LineageEnabled      bool `json:"lineageEnabled"`
+		DiscoveryEnabled bool `json:"discoveryEnabled"`
+		LineageEnabled   bool `json:"lineageEnabled"`
 	}{
 		DiscoveryEnabled: s.discoveryEnabled != nil && s.discoveryEnabled(request.Context()),
 		LineageEnabled:   s.lineageAvailable(request.Context()),
@@ -151,21 +144,22 @@ type productCollection struct {
 }
 
 type productDescriptor struct {
-	Namespace        string                     `json:"namespace"`
-	Name             string                     `json:"name"`
-	ID               string                     `json:"id"`
-	DisplayName      string                     `json:"displayName"`
-	Description      string                     `json:"description"`
-	Version          string                     `json:"version"`
-	Owner            datav1alpha1.ProductOwner  `json:"owner"`
-	DocumentationURL string                     `json:"documentationUrl,omitempty"`
-	Inputs           []datav1alpha1.InputPort   `json:"inputs,omitempty"`
-	Outputs          []datav1alpha1.OutputPort  `json:"outputs"`
-	UI               *datav1alpha1.ProductUI    `json:"ui,omitempty"`
-	Ready            bool                       `json:"ready"`
-	Readiness        readinessDescriptor        `json:"readiness"`
-	Composition      *readinessDescriptor       `json:"composition,omitempty"`
-	Lineage          []datav1alpha1.InputStatus `json:"lineage,omitempty"`
+	Namespace        string                    `json:"namespace"`
+	Name             string                    `json:"name"`
+	ID               string                    `json:"id"`
+	DisplayName      string                    `json:"displayName"`
+	Description      string                    `json:"description"`
+	Version          string                    `json:"version"`
+	Owner            datav1alpha1.ProductOwner `json:"owner"`
+	DocumentationURL string                    `json:"documentationUrl,omitempty"`
+	Inputs           []datav1alpha1.InputPort  `json:"inputs,omitempty"`
+	Outputs          []datav1alpha1.OutputPort `json:"outputs"`
+	// UI is populated only for compatible historical publisher reports, never registry responses.
+	UI          *datav1alpha1.ProductUI    `json:"ui,omitempty"`
+	Ready       bool                       `json:"ready"`
+	Readiness   readinessDescriptor        `json:"readiness"`
+	Composition *readinessDescriptor       `json:"composition,omitempty"`
+	Lineage     []datav1alpha1.InputStatus `json:"lineage,omitempty"`
 }
 
 type readinessDescriptor struct {
@@ -269,7 +263,6 @@ func descriptorFor(product *datav1alpha1.DataProduct) productDescriptor {
 		DocumentationURL: product.Spec.DocumentationURL,
 		Inputs:           product.Spec.Inputs,
 		Outputs:          product.Spec.Outputs,
-		UI:               product.Spec.UI,
 		Ready:            ready,
 		Readiness:        readiness,
 		Composition:      composition,

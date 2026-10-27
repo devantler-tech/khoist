@@ -11,26 +11,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// TestAppearanceConfiguration keeps registry grants withdrawn for every legacy flag combination.
-func TestAppearanceConfiguration(t *testing.T) {
+// TestWorkspaceCapabilityConfiguration preserves the independent discovery and lineage gates.
+func TestWorkspaceCapabilityConfiguration(t *testing.T) {
 	t.Parallel()
 	scheme := runtime.NewScheme()
 	if err := datav1alpha1.AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
-	for _, contract := range []bool{false, true} {
-		for _, appearance := range []bool{false, true} {
+	for _, discovery := range []bool{false, true} {
+		for _, lineage := range []bool{false, true} {
 			handler := NewHandlerWithOptions(
 				fake.NewClientBuilder().WithScheme(scheme).Build(),
 				HandlerOptions{
-					ContractEnabled:   func(context.Context) bool { return contract },
-					AppearanceEnabled: func(context.Context) bool { return appearance },
+					DiscoveryEnabled: func(context.Context) bool { return discovery },
+					LineageEnabled:   func(context.Context) bool { return lineage },
+					InputCompatibility: func(datav1alpha1.InputPort, *datav1alpha1.DataProduct) string {
+						return "compatible"
+					},
 				},
 			)
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(
 				response,
-				httptest.NewRequestWithContext(t.Context(), "GET", "/api/v1/ui-config", nil),
+				httptest.NewRequestWithContext(t.Context(), "GET", "/api/v1/workspace-config", nil),
 			)
 			if response.Code != 200 {
 				t.Fatalf("presentation configuration unavailable: %d", response.Code)
@@ -39,12 +42,12 @@ func TestAppearanceConfiguration(t *testing.T) {
 			if err := json.Unmarshal(response.Body.Bytes(), &config); err != nil {
 				t.Fatal(err)
 			}
-			if len(config) != 4 || config["uiAppearanceEnabled"] ||
-				config["uiContractEnabled"] || config["discoveryEnabled"] || config["lineageEnabled"] {
+			if len(config) != 2 || config["discoveryEnabled"] != discovery ||
+				config["lineageEnabled"] != (discovery && lineage) {
 				t.Fatalf(
-					"incorrect presentation policy for contract=%t appearance=%t: %v",
-					contract,
-					appearance,
+					"incorrect workspace policy for discovery=%t lineage=%t: %v",
+					discovery,
+					lineage,
 					config,
 				)
 			}

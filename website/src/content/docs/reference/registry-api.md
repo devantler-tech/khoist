@@ -11,7 +11,7 @@ Deployment authentication and access policy are owned by the platform.
 |---------------------------------------------------|----------------------------------|--------------------------------|
 | `GET /`                                           | API-only registry workspace      | None                           |
 | `GET /api/v1/products`                            | Existing product-list projection | None                           |
-| `GET /api/v1/ui-config`                           | Workspace capability settings    | None                           |
+| `GET /api/v1/workspace-config`                    | Discovery and lineage settings   | None                           |
 | `GET /api/v2/products`                            | Bounded descriptor discovery     | Registry discovery             |
 | `GET /api/v2/products/{namespace}/{name}`         | One public descriptor            | Registry discovery             |
 | `GET /api/v2/schema`                              | Discovery and descriptor schemas | See discovery reference        |
@@ -19,6 +19,10 @@ Deployment authentication and access policy are owned by the platform.
 | `GET /api/v1/catalog`                             | DCAT catalogue                   | DCAT catalogue                 |
 
 ## Select a named output
+
+Registry responses omit legacy product UI metadata. The removed `/api/v1/ui-config`
+returns `404`; use `/api/v1/workspace-config` for the two current capability settings.
+Historical v1 descriptors and publisher reports keep their optional legacy `ui` field.
 
 Use the descriptor's output name and standard contract in your application.
 Keep metadata validation separate from endpoint approval and query execution.

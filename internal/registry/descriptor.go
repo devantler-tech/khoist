@@ -18,7 +18,9 @@ func PublicationPreview(product *datav1alpha1.DataProduct) ([]byte, error) {
 	preview.Status = datav1alpha1.DataProductStatus{}
 	preview.Generation = 0
 	preview.DeletionTimestamp = nil
-	return encodePortableDescriptor(preview)
+	descriptor := portableDescriptorFor(preview)
+	descriptor.UI = preview.Spec.UI
+	return encodeDescriptor(descriptor)
 }
 
 // ValidPublicationUI checks publisher declarations without establishing a session or granting capabilities.
@@ -163,7 +165,11 @@ func healthExplanation(state string) string {
 
 // encodePortableDescriptor enforces field, collection and encoded bounds before publishing metadata.
 func encodePortableDescriptor(product *datav1alpha1.DataProduct) ([]byte, error) {
-	descriptor := portableDescriptorFor(product)
+	return encodeDescriptor(portableDescriptorFor(product))
+}
+
+// encodeDescriptor shares the same bounds and metadata validation with legacy publisher previews.
+func encodeDescriptor(descriptor portableDescriptor) ([]byte, error) {
 	if !withinDiscoveryBounds(reflect.ValueOf(descriptor)) {
 		return nil, errDescriptorTooLarge
 	}

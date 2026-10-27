@@ -6,11 +6,12 @@
 # matrix_observation joins immutable workload identity, current product conditions and both serving registry replicas for one phase.
 # Only the contracts family declares a contract check, so only it can require ContractsReady.
 matrix_observation() {
-	local phase=$1 image=$2 runtime=$3 expected_title=KHoist
+	local phase=$1 image=$2 runtime=$3 expected_title=KHoist configuration_profile=workspace
 	local conditions=(--condition Ready --condition ConnectorReady)
 	# Rollback restores the signed released workspace, before the candidate rename.
 	if [[ $phase == rollback ]]; then
 		expected_title='Data products'
+		configuration_profile=legacy
 	fi
 	case ${matrix_contracts:-} in
 	true) conditions+=(--condition ContractsReady) ;;
@@ -29,7 +30,7 @@ matrix_observation() {
 		--evidence-dir "$test_dir/observed-matrix-$phase"
 	[[ $(kube get dataproduct existing-export -o json | jq -er '.metadata.uid') == "$matrix_product_uid" ]]
 	registry_ready true
-	registry_replicas_ready "$expected_title"
+	registry_replicas_ready "$expected_title" "$configuration_profile"
 }
 
 # matrix_recovered waits for the selected families' recovery signal after a release transition.

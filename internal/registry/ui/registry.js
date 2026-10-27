@@ -441,6 +441,9 @@ async function loadProducts() {
   clearSelection();
   continuation = "";
   inventoryComplete = false;
+  discoveryEnabled = false;
+  lineageEnabled = false;
+  document.querySelector("#catalog-scope").hidden = true;
   scope.hidden = true;
   scope.textContent = "";
   rejectedProducts = 0;
@@ -453,12 +456,15 @@ async function loadProducts() {
   inventoryLoaded = false;
   count.textContent = "Loading…";
   status.textContent = "Loading products…";
+  let configurationReady = false;
   try {
-    const configurationResponse = await fetch("/api/v1/ui-config", {cache: "no-store", signal: signal(5000)});
-    const configuration = configurationResponse.ok ? await boundedJSON(configurationResponse, 4096) : {};
+    const configurationResponse = await fetch("/api/v1/workspace-config", {cache: "no-store", signal: signal(5000)});
+    if (!configurationResponse.ok) throw new Error("Workspace settings are unavailable.");
+    const configuration = await boundedJSON(configurationResponse, 4096);
     if (request !== inventoryRequest) return;
     discoveryEnabled = configuration.discoveryEnabled === true;
     lineageEnabled = configuration.lineageEnabled === true;
+    configurationReady = true;
     document.querySelector("#catalog-scope").hidden = !discoveryEnabled;
     if (discoveryEnabled) navigateProduct(routeKey());
     // Sixteen 64 KiB descriptors leave room inside the 2 MiB response bound.
@@ -489,8 +495,9 @@ async function loadProducts() {
   } catch (error) {
     if (request !== inventoryRequest) return;
     count.textContent = "Unavailable";
-    status.textContent =
-      "Could not load products. Use Refresh products to retry.";
+    status.textContent = configurationReady
+      ? "Could not load products. Use Refresh products to retry."
+      : "Workspace settings are unavailable. Reload this page, or use Refresh products to retry.";
     console.error(error);
   } finally {
     if (request === inventoryRequest) refresh.disabled = false;

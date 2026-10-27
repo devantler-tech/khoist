@@ -84,8 +84,8 @@ func TestProductRegistryReturnsPortableDescriptors(t *testing.T) {
 			product.Spec.Outputs[0].ContractURL,
 		)
 	}
-	if descriptor.UI == nil || descriptor.UI.URL != product.Spec.UI.URL {
-		t.Fatalf("UI = %#v, want URL %q", descriptor.UI, product.Spec.UI.URL)
+	if descriptor.UI != nil {
+		t.Fatalf("registry returned retired UI metadata: %#v", descriptor.UI)
 	}
 	if !descriptor.Ready || descriptor.Readiness.Reason != "DependenciesReady" {
 		t.Fatalf(

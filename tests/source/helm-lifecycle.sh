@@ -41,7 +41,7 @@ install_chart() {
 # installed_observation verifies exact workloads, current readiness and each replica's phase-specific page.
 installed_observation() {
 	: "${cluster_context:?owned fixture context required}"
-	local phase=$1 image=$2 runtime=$3 expected_title=$4 allowance
+	local phase=$1 image=$2 runtime=$3 expected_title=$4 configuration_profile=${5:-workspace} allowance
 	allowance=$(publication_budget) || return 1
 	((allowance <= 180)) || allowance=180
 	bash "$repo_root/scripts/observe-rollout.sh" --kubeconfig "$KUBECONFIG" \
@@ -50,7 +50,7 @@ installed_observation() {
 		--condition Ready --condition ConnectorReady --image "$image" \
 		--runtime-digest "$runtime" --timeout "$allowance" --evidence-dir "$test_dir/observed-$phase"
 	registry_ready true
-	registry_replicas_ready "$expected_title"
+	registry_replicas_ready "$expected_title" "$configuration_profile"
 }
 
 # installed_query_check exercises source data and contract while preserving product and independent-resource identities.
@@ -108,7 +108,7 @@ helm_release_lifecycle() {
 	wait_for 'installed signed baseline reaches exact product readiness' 240 readiness True true
 	lifecycle_product_uid=$(kube get dataproduct existing-export -o json | jq -er '.metadata.uid')
 	lifecycle_resource_uids=$(independent_resource_uids "$lifecycle_product_uid")
-	installed_observation baseline "$baseline_image" "$baseline_runtime" 'Data products'
+	installed_observation baseline "$baseline_image" "$baseline_runtime" 'Data products' legacy
 	installed_query_check
 	helm show crds "$candidate_chart" | kubectl --request-timeout=15s apply -f - >/dev/null
 	kubectl --request-timeout=0 wait crd/dataproducts.data.devantler.tech --for=condition=Established --timeout=60s >/dev/null
@@ -124,7 +124,7 @@ helm_release_lifecycle() {
 	helm_scoped rollback dpc "$baseline_revision" --wait --timeout 240s >/dev/null
 	helm_installed_identity 1.12.0 "$baseline_image" data-product-controller
 	wait_for 'real Helm rollback restores the released baseline and query' 240 readiness True true
-	installed_observation rollback "$baseline_image" "$baseline_runtime" 'Data products'
+	installed_observation rollback "$baseline_image" "$baseline_runtime" 'Data products' legacy
 	installed_query_check
 	[[ $(kubectl --request-timeout=15s get crd/dataproducts.data.devantler.tech -o json | jq -er '.metadata.uid') == "$baseline_crd_uid" ]]
 	install_chart --set httpSource.enabled=true --set connectorReadiness.enabled=true

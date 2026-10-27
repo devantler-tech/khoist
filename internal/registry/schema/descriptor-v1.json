@@ -44,7 +44,11 @@
       "maxItems": 1024,
       "items": { "$ref": "#/$defs/output" }
     },
-    "ui": { "$ref": "#/$defs/ui" },
+    "ui": {
+      "$ref": "#/$defs/ui",
+      "deprecated": true,
+      "description": "Legacy publisher metadata retained for historical v1 exports; registry responses no longer emit this field."
+    },
     "ready": { "type": "boolean" },
     "readiness": { "$ref": "#/$defs/readiness" },
     "composition": { "$ref": "#/$defs/readiness" },

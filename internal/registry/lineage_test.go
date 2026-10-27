@@ -395,7 +395,7 @@ func TestLineageFeatureStates(t *testing.T) {
 			}
 			var config map[string]bool
 			if err := json.Unmarshal(
-				discoveryRequest(t, handler, "/api/v1/ui-config").Body.Bytes(),
+				discoveryRequest(t, handler, "/api/v1/workspace-config").Body.Bytes(),
 				&config,
 			); err != nil {
 				t.Fatal(err)

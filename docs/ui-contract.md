@@ -1,6 +1,7 @@
 # Legacy UI metadata
 
-KHoist accepts bounded legacy `v1alpha1` UI declarations and descriptor fields as public metadata.
+KHoist retains bounded legacy `v1alpha1` UI declarations and historical publisher descriptor fields.
+Registry list, detail and lineage responses omit product UI metadata.
 They grant no data access and activate no product code. The registry and publisher-review application
 never mount product frames, import publisher JavaScript or exchange presentation messages.
 Consumer applications own their interfaces and use named API outputs and standard contracts.
@@ -27,8 +28,13 @@ rewrite stored Kubernetes declarations solely to upgrade this runtime.
   collections and lossy numeric tokens remain rejected by the canonical metadata validators.
 
 These fields are inert descriptions. A valid declaration does not establish a session, a current
-publisher approval, a fresh readiness observation or a reachable endpoint. The registry’s legacy
-presentation configuration booleans remain false.
+publisher approval, a fresh readiness observation or a reachable endpoint. The registry's
+`/api/v1/workspace-config` exposes only discovery and lineage settings. The removed
+`/api/v1/ui-config` returns `404`; no presentation configuration flags remain.
+
+The v1 descriptor schema retains its optional deprecated `ui` property so historical exports
+and both publisher report formats remain valid. The registry no longer emits that property;
+removing it from the schema requires a separate descriptor version under ADR 0024.
 
 ## Inspect without execution
 

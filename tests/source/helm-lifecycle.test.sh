@@ -91,6 +91,11 @@ registry_replicas_ready() {
 			"$phase" "$wanted_registry_title" "${1:-KHoist}" >&2
 		return 1
 	fi
+	if [[ ${2:-workspace} != "$wanted_configuration_profile" ]]; then
+		printf 'wrong registry configuration for %s: expected %s, requested %s\n' \
+			"$phase" "$wanted_configuration_profile" "${2:-workspace}" >&2
+		return 1
+	fi
 }
 matrix_product_uid=product-1
 # Only a job running the contracts family declares a contract check, so only it requires ContractsReady.
@@ -98,6 +103,8 @@ for matrix_contracts in true false; do
 	for observation in 'candidate:KHoist' 'rollback:Data products' 'restored-candidate:KHoist'; do
 		phase=${observation%%:*}
 		wanted_registry_title=${observation#*:}
+		wanted_configuration_profile=workspace
+		[[ $phase != rollback ]] || wanted_configuration_profile=legacy
 		matrix_observation "$phase" candidate-image "$product_digest"
 		grep -Fq -- '--condition Ready --condition ConnectorReady' "$work/observation-args"
 		grep -Fq -- '--deployment dpc-contract-probe:contract-probe' "$work/observation-args"

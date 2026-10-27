@@ -49,9 +49,7 @@ func TestRegistryAPIOnly(t *testing.T) {
 				reader := fake.NewClientBuilder().WithScheme(scheme).WithObjects(product).Build()
 				catalog := httptest.NewTLSServer(
 					registry.NewHandlerWithOptions(reader, registry.HandlerOptions{
-						ContractEnabled:   func(context.Context) bool { return enabled },
-						AppearanceEnabled: func(context.Context) bool { return enabled },
-						DiscoveryEnabled:  func(context.Context) bool { return enabled },
+						DiscoveryEnabled: func(context.Context) bool { return enabled },
 					}),
 				)
 				t.Cleanup(catalog.Close)

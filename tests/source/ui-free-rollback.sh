@@ -21,7 +21,7 @@ ui_free_release_receipt() {
 # ui_free_rollback_lifecycle restores actual stored signed revisions for workloads and product declarations together.
 ui_free_rollback_lifecycle() {
 	: "${product_digest:?immutable candidate image required}" "${candidate_chart:?packaged candidate required}"
-	local release_dir=$test_dir/ui-free-release allowance phase chart version image runtime values
+	local release_dir=$test_dir/ui-free-release allowance phase chart version image runtime values configuration_profile
 	local workload_revision publication_revision saved_workload saved_publication previous_workload=0 previous_publication=0
 	local controller_uid baseline_controller_uid
 	local candidate_version candidate_image="localhost:5055/data-product-controller@$product_digest"
@@ -40,12 +40,14 @@ ui_free_rollback_lifecycle() {
 
 	for phase in baseline candidate rollback restored; do
 		if [[ $phase == baseline || $phase == rollback ]]; then
+			configuration_profile=legacy
 			chart=$release_dir/release-chart.tgz
 			chart_name=data-product-controller
 			version=5.0.0
 			image=$(jq -er '.imageReference' "$release_dir/release.json")
 			runtime=$(jq -er '.runtimeDigest' "$release_dir/release.json")
 		else
+			configuration_profile=workspace
 			chart=$candidate_chart
 			chart_name=${candidate_chart_name:?packaged candidate chart name required}
 			version=$candidate_version
@@ -83,7 +85,7 @@ ui_free_rollback_lifecycle() {
 		fi
 		[[ $controller_uid == "$baseline_controller_uid" ]]
 		wait_for "signed UI-free $phase reaches current product readiness" 240 readiness True true
-		installed_observation "ui-free-$phase" "$image" "$runtime" KHoist
+		installed_observation "ui-free-$phase" "$image" "$runtime" KHoist "$configuration_profile"
 		installed_query_check
 		publication_snapshot "ui-free-$phase" false
 		publication_budget >/dev/null

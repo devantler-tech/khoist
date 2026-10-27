@@ -13,9 +13,15 @@ the same choice as `registryDiscovery.enabled`. Invalid settings fail startup.
 
 When disabled, every new discovery route returns `404` without reading Kubernetes.
 The existing registry workspace and `/api/v1/products` remain available.
-`GET /api/v1/ui-config` advertises `discoveryEnabled` independently of the UI contract
-and appearance compatibility keys, which are always false in the API-only registry.
+`GET /api/v1/workspace-config` advertises only `discoveryEnabled` and `lineageEnabled`;
+lineage still requires discovery and its compatibility evaluator. The retired
+`GET /api/v1/ui-config` returns `404`. Registry projections omit legacy product UI fields,
+while historical v1 descriptors and publisher reports retain their compatible schema.
 Enabling discovery grants no publisher execution or data access.
+
+If workspace settings disappear after a server rollback or cannot be read, an already-open
+workspace withdraws selected metadata and asks you to reload. Refresh products retries the
+current settings; it does not silently switch to the legacy inventory.
 
 ## Read a product or page
 

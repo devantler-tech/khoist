@@ -111,7 +111,7 @@ func TestDiscoveryGateNeverReads(t *testing.T) {
 				t.Fatalf("disabled %s status=%d, want 404", target, got.Code)
 			}
 		}
-		got := discoveryRequest(t, handler, "/api/v1/ui-config")
+		got := discoveryRequest(t, handler, "/api/v1/workspace-config")
 		if !strings.Contains(got.Body.String(), `"discoveryEnabled":false`) {
 			t.Fatalf("missing disabled capability: %s", got.Body.String())
 		}
