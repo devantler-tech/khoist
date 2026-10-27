@@ -19,6 +19,10 @@ lineage still requires discovery and its compatibility evaluator. The retired
 while historical v1 descriptors and publisher reports retain their compatible schema.
 Enabling discovery grants no publisher execution or data access.
 
+If workspace settings disappear after a server rollback or cannot be read, an already-open
+workspace withdraws selected metadata and asks you to reload. Refresh products retries the
+current settings; it does not silently switch to the legacy inventory.
+
 ## Read a product or page
 
 `GET /api/v2/products/{namespace}/{name}` reads one exact product through the uncached
