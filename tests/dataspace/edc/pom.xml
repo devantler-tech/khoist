@@ -15,6 +15,24 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+      <!-- Pin the scanned artifacts directly as well as through their BOMs. When Maven Central
+           rate-limits a BOM fetch, osv-scanner falls back to EDC's older transitive versions and
+           reports advisories this graph does not resolve to; direct entries need no fetch. -->
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-api</artifactId>
+        <version>${opentelemetry.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
