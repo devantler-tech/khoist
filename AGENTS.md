@@ -26,7 +26,7 @@ The minimum Go version is declared only in `go.mod`. The public roadmap is GitHu
 - `cmd/publisher-review/` — independent default-off publisher report host; presentation and discovery flags have no effect.
 - `cmd/ui-kit/` — deprecated default-off UI compatibility host; its publisher route remains available during migration.
 - `internal/portablehost/` — shared TLS/gateway listener, bounded health and graceful shutdown for both static hosts.
-- `internal/demoproduct/` and `cmd/demo-product/` — independent harbour reference and standard live KSail release interfaces, with default-off optional catalogue publication.
+- `internal/demoproduct/` and `cmd/demo-product/` — independent harbour reference and standard live KSail release interfaces, with default-off optional catalog publication.
 - `internal/httpsource/` and `cmd/http-source/` — default-off, Secret-configured read-only HTTPS JSON export connector with separate query and management listeners.
 - `internal/contractprobe/` and `cmd/contract-probe/` — independent credential-free HTTPS contract reachability with bounded requests and management-only endpoints.
 - `pkg/featureflag/` — OpenFeature boundary; provisioned sources, connector readiness, contract readiness, composition and DCAT publication are default-off. The registry workspace is always available.
@@ -110,7 +110,9 @@ Do not copy instructions into them; `scripts/validate-agent-shims.test.sh` enfor
   metadata inspection grants no execution. See
   `docs/dependency-traces.md` and `docs/ui-contract.md`.
 - DCAT publication requires the explicit `data.devantler.tech/dcat-type: Dataset` annotation and
-  the default-off `dcat-catalog` gate. It projects public metadata only; a listing grants no access
+  the default-off `dcat-catalog` operational gate. This long-lived gate preserves the operator's
+  disclosure choice for the cluster-wide catalog and its operator-owned identity.
+  It projects public metadata only; a listing grants no access
   and asserts no readiness. Preserve the configured catalog identity, stable output identities,
   one concurrent request, 16-object pages, 256-product/17-request/five-second scan bounds,
   1,024 outputs, 16-KiB fields, 1-MiB retained public metadata and 2-MiB encoded responses.
