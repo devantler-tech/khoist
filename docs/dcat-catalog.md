@@ -83,7 +83,7 @@ Dataset annotation. That resource still requires `demoProduct.enabled=true` and
 ## Metadata mapping and identity
 
 | Public metadata                      | RDF term or relationship                                                         |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
+|--------------------------------------|----------------------------------------------------------------------------------|
 | Configured catalog ID                | Catalog `@id`; type `dcat:Catalog`                                               |
 | Product `spec.id`                    | Dataset `@id`; literal `dcterms:identifier`                                      |
 | Product name, description, version   | `dcterms:title`, `dcterms:description`, `dcat:version`                           |
@@ -133,7 +133,7 @@ products without the annotation. Failure never returns a partial catalog as a
 successful response.
 
 | Status | Meaning and action                                                                                                                         |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+|--------|--------------------------------------------------------------------------------------------------------------------------------------------|
 | 200    | Complete JSON-LD catalog, possibly containing no datasets.                                                                                 |
 | 404    | Operational switch disabled; no Kubernetes read occurred.                                                                                  |
 | 413    | Scan or encoded-response bound exceeded; reduce the catalog's size.                                                                        |
