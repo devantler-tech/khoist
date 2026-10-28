@@ -135,7 +135,7 @@ successful response.
 | Status | Meaning and action                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 200    | Complete JSON-LD catalog, possibly containing no datasets.                                                                                 |
-| 404    | Release flag disabled; no Kubernetes read occurred.                                                                                        |
+| 404    | Operational switch disabled; no Kubernetes read occurred.                                                                                  |
 | 413    | Scan or encoded-response bound exceeded; reduce the catalog's size.                                                                        |
 | 422    | Invalid annotation, public metadata or conflicting identity, including metadata/output bounds; correct the publisher's declaration.        |
 | 503    | Missing configured ID, unavailable/timed-out Kubernetes API, or another active catalog request; fix configuration or retry after recovery. |
