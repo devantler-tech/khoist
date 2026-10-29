@@ -4,7 +4,7 @@ This test uses Eclipse EDC Connector **0.18.1**, source
 `3a22ff4aa90213a564309b5a05851e6d7f27f9ff`, to import an unchanged DSP export.
 It runs real Titanium JSON-LD expansion and the DSP 2025 catalog and ODRL
 transformers. It does not boot a Connector or implement IAM, negotiation or transfer.
-The tested dependency profile applies the Jackson 2.21.7 and OpenTelemetry 1.62.0
+The tested dependency profile applies the Jackson 2.21.7 and OpenTelemetry 1.67.0
 security BOMs to EDC's transitive dependencies. Results describe this locked
 combination, not the unmodified upstream dependency graph.
 

@@ -10,7 +10,7 @@
   <properties>
     <edc.version>0.18.1</edc.version>
     <jackson.version>2.21.7</jackson.version>
-    <opentelemetry.version>1.62.0</opentelemetry.version>
+    <opentelemetry.version>1.67.0</opentelemetry.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <dependencyManagement>
