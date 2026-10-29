@@ -202,6 +202,7 @@ jobs:
           bash tests/source/edc-release.test.sh
           bash tests/source/suite.test.sh
           bash tests/source/catalog.test.sh
+          bash tests/source/ci-prerequisites.test.sh
 
   source-integration:
     needs: plan
@@ -239,6 +240,26 @@ jobs:
           mkdir "$RUNNER_TEMP/ksail-bin"
           tar -xzf "$RUNNER_TEMP/ksail.tar.gz" -C "$RUNNER_TEMP/ksail-bin" ksail
           echo "$RUNNER_TEMP/ksail-bin" >> "$GITHUB_PATH"
+
+      - name: Install verified Helm 3
+        env:
+          HELM_VERSION: v3.22.1
+          HELM_SHA256: 896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            --retry 3 --max-time 180 --output "$RUNNER_TEMP/helm.tar.gz" \
+            "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz"
+          printf '%s  %s\n' "$HELM_SHA256" "$RUNNER_TEMP/helm.tar.gz" | sha256sum --check -
+          mkdir "$RUNNER_TEMP/helm-bin"
+          tar -xzf "$RUNNER_TEMP/helm.tar.gz" --strip-components=1 \
+            -C "$RUNNER_TEMP/helm-bin" linux-amd64/helm
+          installed_version=$("$RUNNER_TEMP/helm-bin/helm" version --short)
+          if [[ "$installed_version" != "$HELM_VERSION"+* ]]; then
+            echo 'installed Helm version does not match the pinned release' >&2
+            exit 1
+          fi
+          echo "$RUNNER_TEMP/helm-bin" >> "$GITHUB_PATH"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
