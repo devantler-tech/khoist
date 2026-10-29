@@ -249,7 +249,7 @@ jobs:
           set -euo pipefail
           curl --fail --location --proto '=https' --proto-redir '=https' \
             --retry 3 --max-time 180 --output "$RUNNER_TEMP/helm.tar.gz" \
-            "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz"
+            https://get.helm.sh/helm-v3.22.1-linux-amd64.tar.gz
           printf '%s  %s\n' "$HELM_SHA256" "$RUNNER_TEMP/helm.tar.gz" | sha256sum --check -
           mkdir "$RUNNER_TEMP/helm-bin"
           tar -xzf "$RUNNER_TEMP/helm.tar.gz" --strip-components=1 \
