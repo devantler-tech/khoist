@@ -18,12 +18,12 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/devantler-tech/data-product-controller",
+          href: "https://github.com/devantler-tech/khoist",
         },
       ],
       editLink: {
         baseUrl:
-          "https://github.com/devantler-tech/data-product-controller/edit/main/website/",
+          "https://github.com/devantler-tech/khoist/edit/main/website/",
       },
       head: [
         {
