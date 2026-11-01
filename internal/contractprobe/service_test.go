@@ -316,6 +316,13 @@ func TestSlowContractTimesOut(t *testing.T) {
 			time.Since(started),
 		)
 	}
+	metrics := request(t, service, "GET", "/metrics").Body.String()
+	if !strings.Contains(
+		metrics,
+		`contract_probe_failures_total{http_status="200",reason="timeout",stage="body"} 1`+"\n",
+	) {
+		t.Fatalf("stalled body was not distinguished from a request timeout: %s", metrics)
+	}
 }
 
 // TestProbeRejectsRequestBodies prevents management callers from supplying upstream inputs.

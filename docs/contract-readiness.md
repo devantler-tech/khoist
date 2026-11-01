@@ -118,10 +118,27 @@ fetching the contract. `/metrics` does not trigger a fetch and exposes:
 
 - `contract_probe_ready`: latest completed result, zero before the first check;
 - `contract_probe_last_observation_timestamp_seconds`: freshness of that result;
-- `contract_probe_requests_total{result}`: counters using only fixed reason labels.
+- `contract_probe_requests_total{result}`: counters using only fixed reason labels;
+- `contract_probe_failures_total{stage,reason,http_status}`: completed
+  `ContractUnavailable` results separated into request, rejected status and response-body failures.
 
-A metrics scrape observes the completed result, timestamp and result counter as one
-snapshot, including when it overlaps publication of a new result.
+Failure stages are `request`, `status` and `body`. The reason is one of `dns`,
+`timeout`, `tls`, `connection_reset`, `connection_refused`, `unexpected_eof`,
+`eof`, `http_status` or `other`. DNS includes typed DNS timeout errors; other
+timeouts retain `timeout`. TLS identifies typed certificate-verification and
+TLS-record errors; unclassified errors remain `other`. A rejected response has
+reason `http_status`. HTTP status labels retain only codes 100–599; `none` means
+no response was received, and `other` bounds nonstandard codes. No error text,
+response content or target address is used as a label. Readiness reasons and
+request limits are unchanged, and the probe adds no retry.
+
+Counter series appear when their first event is recorded. Inspect raw counts as
+well as changes: an increase query can miss an event already present in the
+series' first sample. Counts reset with the process; bind comparisons to the
+same running Pod instance and confirm observation freshness before judging recovery.
+
+A metrics scrape observes the completed result, timestamp, result counter and
+failure diagnostics as one snapshot, including when it overlaps publication of a new result.
 A busy or caller-cancelled request does not replace the last completed result or
 its timestamp. A probe's own upstream timeout remains a completed failure. Readiness evaluates
 fresh network access; metrics describe the last completed observation.

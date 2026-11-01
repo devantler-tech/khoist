@@ -4,12 +4,15 @@ package contractprobe
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,9 +29,15 @@ type Service struct {
 	metrics  http.Handler
 	registry *prometheus.Registry
 	requests *prometheus.CounterVec
+	failures *prometheus.CounterVec
 	ready    prometheus.Gauge
 	observed prometheus.Gauge
 	metricMu sync.RWMutex
+}
+
+// probeObservation keeps diagnostics private until the whole completed result is published.
+type probeObservation struct {
+	result, stage, failureReason, httpStatus string
 }
 
 // NewService constructs a default-off probe with fixed network and resource boundaries.
@@ -63,6 +72,13 @@ func NewService(target string, enabled func(context.Context) bool) *Service {
 			},
 			[]string{"result"},
 		),
+		failures: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "contract_probe_failures_total",
+				Help: "Completed unavailable contract probes by bounded failure stage and cause.",
+			},
+			[]string{"stage", "reason", "http_status"},
+		),
 		ready: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "contract_probe_ready",
@@ -76,7 +92,7 @@ func NewService(target string, enabled func(context.Context) bool) *Service {
 			},
 		),
 	}
-	registry.MustRegister(service.requests, service.ready, service.observed)
+	registry.MustRegister(service.requests, service.failures, service.ready, service.observed)
 	service.metrics = promhttp.HandlerFor(service, promhttp.HandlerOpts{})
 	return service
 }
@@ -127,9 +143,9 @@ func (s *Service) readiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ContractProbeBusy", http.StatusServiceUnavailable)
 		return
 	}
-	reason := "FeatureDisabled"
+	observation := probeObservation{result: "FeatureDisabled"}
 	if s.enabled != nil && s.enabled(r.Context()) {
-		reason = s.fetch(r.Context())
+		observation = s.fetch(r.Context())
 	}
 	if r.Context().Err() != nil {
 		s.requests.WithLabelValues("ContractProbeCancelled").Inc()
@@ -143,22 +159,26 @@ func (s *Service) readiness(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ContractProbeCancelled", http.StatusServiceUnavailable)
 		return
 	}
-	s.requests.WithLabelValues(reason).Inc()
+	s.requests.WithLabelValues(observation.result).Inc()
+	if observation.stage != "" {
+		s.failures.WithLabelValues(observation.stage, observation.failureReason, observation.httpStatus).
+			Inc()
+	}
 	s.observed.SetToCurrentTime()
 	s.ready.Set(0)
-	if reason == "ContractReachable" {
+	if observation.result == "ContractReachable" {
 		s.ready.Set(1)
 	}
 	s.metricMu.Unlock()
-	if reason == "ContractReachable" {
+	if observation.result == "ContractReachable" {
 		_, _ = io.WriteString(w, "ContractReachable")
 		return
 	}
-	http.Error(w, reason, http.StatusServiceUnavailable)
+	http.Error(w, observation.result, http.StatusServiceUnavailable)
 }
 
 // fetch discards a complete bounded response; the target is immutable operator configuration.
-func (s *Service) fetch(ctx context.Context) string {
+func (s *Service) fetch(ctx context.Context) probeObservation {
 	target, err := url.Parse(s.target)
 	if err != nil || target.Scheme != "https" || target.Hostname() == "" ||
 		target.User != nil || strings.Contains(s.target, "$(") ||
@@ -166,36 +186,82 @@ func (s *Service) fetch(ctx context.Context) string {
 		target.RawQuery != "" || target.ForceQuery ||
 		target.Fragment != "" ||
 		target.Opaque != "" {
-		return "ContractConfigurationInvalid"
+		return probeObservation{result: "ContractConfigurationInvalid"}
 	}
 	// #nosec G704 -- The validated URL is fixed operator configuration, never caller input.
 	// The independently deployed probe has explicitly restricted network egress.
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.target, nil)
 	if err != nil {
-		return "ContractConfigurationInvalid"
+		return probeObservation{result: "ContractConfigurationInvalid"}
 	}
 	request.Header.Set("Accept-Encoding", "identity")
 	// #nosec G704 -- A fixed operator-configured HTTPS URL is used, never caller input. TLS,
 	// redirects, proxies and size/time/concurrency are bounded; NetworkPolicy scopes egress.
 	response, err := s.client.Do(request)
 	if err != nil {
-		return "ContractUnavailable"
+		return unavailableObservation("request", 0, err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		return "ContractUnavailable"
+		return unavailableObservation("status", response.StatusCode, nil)
 	}
 	encodings := response.Header.Values("Content-Encoding")
 	if response.ContentLength > 1<<20 ||
 		(len(encodings) != 0 && (len(encodings) != 1 || encodings[0] != "identity")) {
-		return "ContractInvalidResponse"
+		return probeObservation{result: "ContractInvalidResponse"}
 	}
 	size, err := io.Copy(io.Discard, io.LimitReader(response.Body, (1<<20)+1))
 	if err != nil {
-		return "ContractUnavailable"
+		return unavailableObservation("body", response.StatusCode, err)
 	}
 	if size == 0 || size > 1<<20 {
-		return "ContractInvalidResponse"
+		return probeObservation{result: "ContractInvalidResponse"}
 	}
-	return "ContractReachable"
+	return probeObservation{result: "ContractReachable"}
+}
+
+// unavailableObservation accepts no upstream text as a label; status cardinality is bounded.
+func unavailableObservation(stage string, status int, err error) probeObservation {
+	observation := probeObservation{
+		result:        "ContractUnavailable",
+		stage:         stage,
+		failureReason: "http_status",
+		httpStatus:    "none",
+	}
+	if status != 0 {
+		observation.httpStatus = "other"
+		if status >= 100 && status <= 599 {
+			observation.httpStatus = strconv.Itoa(status)
+		}
+	}
+	if err != nil {
+		observation.failureReason = failureReason(err)
+	}
+	return observation
+}
+
+// failureReason classifies typed causes through wrapping without retaining error strings or URLs.
+func failureReason(err error) string {
+	var dnsError *net.DNSError
+	var networkError net.Error
+	var certificateError *tls.CertificateVerificationError
+	var recordError tls.RecordHeaderError
+	switch {
+	case errors.As(err, &dnsError):
+		return "dns"
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &networkError) && networkError.Timeout()):
+		return "timeout"
+	case errors.As(err, &certificateError) || errors.As(err, &recordError):
+		return "tls"
+	case errors.Is(err, syscall.ECONNRESET):
+		return "connection_reset"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "connection_refused"
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return "unexpected_eof"
+	case errors.Is(err, io.EOF):
+		return "eof"
+	default:
+		return "other"
+	}
 }

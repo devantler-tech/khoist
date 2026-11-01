@@ -122,7 +122,8 @@ func observationLines(metrics string) string {
 	var result []string
 	for line := range strings.SplitSeq(metrics, "\n") {
 		if strings.HasPrefix(line, "contract_probe_ready ") ||
-			strings.HasPrefix(line, "contract_probe_last_observation_timestamp_seconds ") {
+			strings.HasPrefix(line, "contract_probe_last_observation_timestamp_seconds ") ||
+			strings.HasPrefix(line, "contract_probe_failures_total{") {
 			result = append(result, line)
 		}
 	}
