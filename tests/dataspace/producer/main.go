@@ -11,8 +11,8 @@ import (
 	"net/http/httptest"
 	"os"
 
-	datav1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
-	"github.com/devantler-tech/data-product-controller/internal/catalog"
+	datav1 "github.com/devantler-tech/khoist/api/v1alpha1"
+	"github.com/devantler-tech/khoist/internal/catalog"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"

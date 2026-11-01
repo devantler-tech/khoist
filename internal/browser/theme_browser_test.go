@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	datav1alpha1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
-	"github.com/devantler-tech/data-product-controller/internal/registry"
+	datav1alpha1 "github.com/devantler-tech/khoist/api/v1alpha1"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/registry"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"

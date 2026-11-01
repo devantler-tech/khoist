@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	data "github.com/devantler-tech/data-product-controller/api/v1alpha1"
+	data "github.com/devantler-tech/khoist/api/v1alpha1"
 )
 
 // Removing the delivered field-level rejection must not let either publisher

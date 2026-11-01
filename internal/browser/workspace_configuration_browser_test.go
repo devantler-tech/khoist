@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/devantler-tech/data-product-controller/internal/registry"
+	"github.com/devantler-tech/khoist/internal/registry"
 )
 
 // TestWorkspaceConfigurationRollback withdraws stale metadata and explains how to recover an open page.

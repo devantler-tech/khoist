@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
 )
 
 func TestKSailReleaseSurfaceServesWithoutOptIn(t *testing.T) {

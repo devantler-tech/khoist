@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	datav1alpha1 "github.com/devantler-tech/data-product-controller/api/v1alpha1"
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
-	"github.com/devantler-tech/data-product-controller/internal/registry"
+	datav1alpha1 "github.com/devantler-tech/khoist/api/v1alpha1"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/registry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"

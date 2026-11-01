@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
 )
 
 // TestRetiredPresentationRoutes keeps the public API and independent release consumer usable.

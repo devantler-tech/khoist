@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/devantler-tech/data-product-controller/internal/httpserver"
+	"github.com/devantler-tech/khoist/internal/httpserver"
 )
 
 // Options describes the operator-selected transport and listener.
