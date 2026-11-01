@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devantler-tech/data-product-controller/web"
+	"github.com/devantler-tech/khoist/web"
 )
 
 // TestPortableManifestURLProfile compares real portable library admission with the delivered descriptor profile.

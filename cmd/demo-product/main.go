@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
-	"github.com/devantler-tech/data-product-controller/internal/httpserver"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/httpserver"
 )
 
 func main() {

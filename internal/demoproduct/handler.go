@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/devantler-tech/data-product-controller/internal/config"
+	"github.com/devantler-tech/khoist/internal/config"
 )
 
 //go:embed ui/releases.html ui/product.css ui/product.js

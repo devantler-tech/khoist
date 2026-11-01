@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/devantler-tech/data-product-controller/internal/demoproduct"
+	"github.com/devantler-tech/khoist/internal/demoproduct"
 )
 
 // TestHarbourPresentationUnavailable exercises retired routes in the real browser.

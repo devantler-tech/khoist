@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/devantler-tech/data-product-controller/internal/portablehost"
-	"github.com/devantler-tech/data-product-controller/pkg/featureflag"
-	"github.com/devantler-tech/data-product-controller/web"
+	"github.com/devantler-tech/khoist/internal/portablehost"
+	"github.com/devantler-tech/khoist/pkg/featureflag"
+	"github.com/devantler-tech/khoist/web"
 )
 
 // main reports configuration failures before exposing a listener.
