@@ -35,7 +35,7 @@ docker run --rm --network none --read-only \
   -e DSP_CATALOG_EXPORT_ENABLED=true \
   -v "$PWD/docs/examples/dsp-catalog:/input:ro" \
   --entrypoint /dsp-catalog \
-  ghcr.io/devantler-tech/data-product-controller@RELEASE_DIGEST \
+  ghcr.io/devantler-tech/khoist@RELEASE_DIGEST \
   --catalog /input/catalog.json --bindings /input/bindings.json
 ```
 
