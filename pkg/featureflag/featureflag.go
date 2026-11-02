@@ -10,7 +10,7 @@ import (
 )
 
 // NewProvider builds an in-process OpenFeature provider for deployment flags.
-func NewProvider(flags map[string]bool) memprovider.InMemoryProvider {
+func NewProvider(flags map[string]bool) *memprovider.InMemoryProvider {
 	memFlags := make(map[string]memprovider.InMemoryFlag, len(flags))
 
 	for key, on := range flags {
