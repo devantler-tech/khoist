@@ -81,7 +81,7 @@ docker run --rm --network none --read-only --cap-drop ALL \
   --env PUBLISHER_PREFLIGHT_ENABLED=true \
   --mount "type=bind,src=$PWD/docs/examples,dst=/input,readonly" \
   --entrypoint /product-check \
-  ghcr.io/devantler-tech/data-product-controller@sha256:<verified-image-digest> \
+  ghcr.io/devantler-tech/khoist@sha256:<verified-image-digest> \
   --file /input/composition.yaml --format json
 ```
 
