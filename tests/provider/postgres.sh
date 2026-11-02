@@ -252,7 +252,7 @@ wait_for 'source spec change settles independently of publication metadata' data
 for model in document graph; do
 	wait_for "$model rejects a publication from the previous source generation" model_unavailable "$model" ConnectionPublicationUnsupported
 done
-query_all
+wait_for 'restarted source serves every retained model record' query_all
 bind_hybrid_publications
 wait_for 'verified current source generation restores all publications' matrix_ready True SourceReady
 
