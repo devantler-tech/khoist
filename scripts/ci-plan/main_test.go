@@ -577,10 +577,10 @@ func TestWorkflowClassifierFailureRetainsFullSuite(t *testing.T) {
 			write(t, dir, "scripts/ci-plan/main.go", "trusted fixture")
 			output := filepath.Join(dir, "output")
 			stub := fmt.Sprintf(`go() {
-  [[ "$#" == 6 && "$1" == run && "$2" == scripts/ci-plan/main.go && "$3" == classify &&
-     "$4" == "$GITHUB_WORKSPACE/ci-candidate" && "$5" == "$BASE_SHA" && "$6" == "$TESTED_SHA" ]] || return 93
-  printf '%%s\n' '%s'
-  return %d
+	[[ "$#" == 6 && "$1" == run && "$2" == scripts/ci-plan/main.go && "$3" == classify &&
+		"$4" == "$GITHUB_WORKSPACE/ci-candidate" && "$5" == "$BASE_SHA" && "$6" == "$TESTED_SHA" ]] || return 93
+	printf '%%s\n' '%s'
+	return %d
 }
 `, tc.output, tc.code)
 			cmd := exec.CommandContext(t.Context(), "bash")
