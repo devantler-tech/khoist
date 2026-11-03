@@ -32,5 +32,6 @@ jobs:
     uses: devantler-tech/.github/.github/workflows/template-sync.yaml@16f1a6c96aaf2581885e17389a0e0f9f42387970 # v20.1.1
     with:
       source-repo-path: devantler-tech/go-template
+      use-app-token: true
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
