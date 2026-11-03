@@ -112,6 +112,8 @@ func gitObject(repo, object string) (string, []byte, error) {
 	return fields[1], data[split+1 : split+1+size], nil
 }
 
+// regularFiles inventories immutable tree entries and rejects every mode except
+// regular 100644 files; a blob alone cannot distinguish a file from a symlink.
 func regularFiles(repo, sha, dir string) (map[string]bool, error) {
 	kind, data, err := gitObject(repo, sha+":"+dir)
 	if err != nil {
@@ -202,8 +204,9 @@ func admittedTest(repo, sha, path string) error {
 	return nil
 }
 
-// ADRs are inert documentation, not the executable examples under docs/.
-// Verify Git modes as well as blobs: symlinks are blobs too.
+// addedADRs admits only added, bounded UTF-8 prose in the closed ADR path family.
+// Git tree modes exclude symlinks and executables independently of blob contents;
+// other docs paths may be executable examples and receive no such exemption.
 func addedADRs(repo, head string, changes []string) (bool, error) {
 	pathPattern := regexp.MustCompile(`^docs/adr/[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*\.md$`)
 	for i := 0; i < len(changes); i += 2 {
@@ -230,6 +233,9 @@ func addedADRs(repo, head string, changes []string) (bool, error) {
 	return true, nil
 }
 
+// classify compares exact immutable commits, selecting a narrower profile only
+// after every changed path and relevant object passes its closed admission rules.
+// Unknown objects, syntax, inventory or paths retain the full acceptance suite.
 func classify(repo, base, head string) (string, error) {
 	// Inputs are exact event commits, never branch names or shell expressions.
 	sha := regexp.MustCompile("^[0-9a-f]{40}$")
@@ -295,6 +301,9 @@ func classify(repo, base, head string) (string, error) {
 	return "browser", nil
 }
 
+// checkResults requires the exact job inventory and profile-bound result for
+// every job: selected jobs succeed, and unselected acceptance jobs are skipped.
+// A cancelled, failed or unexpectedly skipped selected job cannot pass the reducer.
 func checkResults(profile string, needs map[string]jobResult) error {
 	if profile != "full" && profile != "browser" && profile != "adr" {
 		return errPlan("unknown selected profile")
