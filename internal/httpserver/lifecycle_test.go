@@ -95,7 +95,11 @@ func TestShutdownWaitsForActiveResponse(t *testing.T) {
 					t.Fatal("shutdown deadline did not bound serving")
 				}
 				select {
-				case <-response:
+				case err = <-response:
+					// The handler is still blocked, so only a closed connection ends the request.
+					if err == nil {
+						t.Fatal("active response completed instead of closing at the deadline")
+					}
 				case <-time.After(time.Second):
 					t.Fatal("deadline did not close the active connection")
 				}
