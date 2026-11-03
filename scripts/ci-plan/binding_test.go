@@ -48,21 +48,20 @@ type bindingStep struct {
 // Pin the complete approved execution body, including argument order and the
 // conservative fallback/output behavior. A command hidden in a comment or an
 // additional output override must not satisfy this trust-boundary contract.
-const trustedSelectorRun = `set -euo pipefail
-profile=full
-if [[ "$EVENT_NAME" == pull_request && -f scripts/ci-plan/main.go ]]; then
-  if candidate=$(go run scripts/ci-plan/main.go classify "$GITHUB_WORKSPACE/ci-candidate" "$BASE_SHA" "$TESTED_SHA"); then
-    case "$candidate" in
-      browser|adr|full) profile="$candidate" ;;
-      *) echo '::warning::Classifier output was unknown; retaining full acceptance.' ;;
-    esac
-  else
-    echo '::warning::Classifier failed; retaining full acceptance.'
-  fi
-fi
-printf 'profile=%s\n' "$profile" >> "$GITHUB_OUTPUT"
-printf 'CI profile: %s; base=%s; tested=%s\n' "$profile" "$BASE_SHA" "$TESTED_SHA"
-`
+const trustedSelectorRun = "set -euo pipefail\n" +
+	"profile=full\n" +
+	"if [[ \"$EVENT_NAME\" == pull_request && -f scripts/ci-plan/main.go ]]; then\n" +
+	"  if candidate=$(go run scripts/ci-plan/main.go classify \"$GITHUB_WORKSPACE/ci-candidate\" \"$BASE_SHA\" \"$TESTED_SHA\"); then\n" +
+	"    case \"$candidate\" in\n" +
+	"      browser|adr|full) profile=\"$candidate\" ;;\n" +
+	"      *) echo '::warning::Classifier output was unknown; retaining full acceptance.' ;;\n" +
+	"    esac\n" +
+	"  else\n" +
+	"    echo '::warning::Classifier failed; retaining full acceptance.'\n" +
+	"  fi\n" +
+	"fi\n" +
+	"printf 'profile=%s\\n' \"$profile\" >> \"$GITHUB_OUTPUT\"\n" +
+	"printf 'CI profile: %s; base=%s; tested=%s\\n' \"$profile\" \"$BASE_SHA\" \"$TESTED_SHA\"\n"
 
 // Each checkout mutation leaves the other job's trusted binding intact, so an
 // early rejection in plan cannot hide a missing required-checks validation.
