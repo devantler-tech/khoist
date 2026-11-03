@@ -28,7 +28,9 @@ and complete rule semantics; reject unknown, stale, ambiguous or mismatched entr
 Never infer a grant from a query URL or product owner.
 
 EDC's [ConsumerOfferResolver][resolver] accepts the request's ID string. Its
-[default resolver][default-resolver] instead dereferences native ID components.
+[default resolver][default-resolver] parses the native ID and loads the contract
+definition named by its definition component, then that definition's configured
+access and contract policies. It does not dereference the asset or UUID components.
 This SPI makes the mapping a feasible design, not proven runtime compatibility.
 [ContractOfferId][offer-id] generates Base64 components, but its parser accepts
 three literal components when decoding fails. A parseable URN is therefore not
