@@ -52,7 +52,7 @@ jobs:
           if [[ "$EVENT_NAME" == pull_request && -f scripts/ci-plan/main.go ]]; then
             if candidate=$(go run scripts/ci-plan/main.go classify "$GITHUB_WORKSPACE/ci-candidate" "$BASE_SHA" "$TESTED_SHA"); then
               case "$candidate" in
-                browser|full) profile="$candidate" ;;
+                browser|adr|full) profile="$candidate" ;;
                 *) echo '::warning::Classifier output was unknown; retaining full acceptance.' ;;
               esac
             else
@@ -206,7 +206,7 @@ jobs:
 
   source-integration:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
+    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}
     name: Validate Kubernetes lifecycle (${{ matrix.suite }})
     runs-on: ubuntu-latest
     strategy:
@@ -271,7 +271,7 @@ jobs:
 
   percona-acceptance:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
+    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}
     name: Validate native Document queries
     # The immutable 8.0.26 reference refuses Linux >=6.19 (SERVER-125742).
     # Keep its real startup guard; use the hosted 6.8 kernel line until the
@@ -325,7 +325,7 @@ jobs:
 
   arango-acceptance:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
+    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}
     name: Validate native Graph queries
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -368,7 +368,7 @@ jobs:
         run: bash tests/provider/arango.sh
   age-image:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
+    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}
     name: Validate PostgreSQL AGE image
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -437,7 +437,7 @@ jobs:
 
   postgres-acceptance:
     needs: plan
-    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}
+    if: ${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}
     name: Validate SQL, JSONB and AGE queries
     runs-on: ubuntu-latest
     timeout-minutes: 40

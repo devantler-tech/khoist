@@ -64,14 +64,15 @@ func TestBrowserPlan(t *testing.T) {
 			case "import":
 				write(
 					t,
-					p,
+					repo,
+					tc.path,
 					"//go:build browser\npackage browser_test\nimport _ \"github.com/devantler-tech/khoist/internal/httpsource\"\n",
 				)
 			case "untag":
-				write(t, p, "package browser_test\n")
+				write(t, repo, tc.path, "package browser_test\n")
 			default:
 				b := readFixture(t, repo, tc.path)
-				write(t, p, string(b)+"\n// changed\n")
+				write(t, repo, tc.path, string(b)+"\n// changed\n")
 			}
 			gitTest(t, repo, "add", "--", tc.path)
 			if tc.mode == "rename" {
@@ -91,7 +92,8 @@ func TestPlanRejectsIncompleteInventoryAndUnknownBase(t *testing.T) {
 	repo, base := fixture(t)
 	write(
 		t,
-		filepath.Join(repo, "internal/browser/omitted_browser_test.go"),
+		repo,
+		"internal/browser/omitted_browser_test.go",
 		"//go:build browser\npackage browser_test\n",
 	)
 	gitTest(t, repo, "add", "--", "internal/browser/omitted_browser_test.go")
@@ -99,7 +101,8 @@ func TestPlanRejectsIncompleteInventoryAndUnknownBase(t *testing.T) {
 	incomplete := gitTest(t, repo, "rev-parse", "HEAD")
 	write(
 		t,
-		filepath.Join(repo, browserFiles[0]),
+		repo,
+		browserFiles[0],
 		"//go:build browser\npackage browser_test\n// modified\n",
 	)
 	gitTest(t, repo, "add", "--", browserFiles[0])
@@ -118,13 +121,17 @@ func TestPlanRejectsIncompleteInventoryAndUnknownBase(t *testing.T) {
 }
 
 func TestRequiredPlanResults(t *testing.T) {
-	for _, profile := range []string{"browser", "full"} {
+	for _, profile := range []string{"browser", "adr", "full"} {
 		needs := validNeeds(profile)
 		if err := checkResults(profile, needs); err != nil {
 			t.Fatal(err)
 		}
 		for _, id := range jobIDs {
-			for _, state := range []string{"failure", "cancelled", "", "unknown"} {
+			states := []string{"failure", "cancelled", "", "unknown"}
+			if needs[id].Result == "success" {
+				states = append(states, "skipped")
+			}
+			for _, state := range states {
 				bad := validNeeds(profile)
 				j := bad[id]
 				j.Result = state
@@ -179,7 +186,8 @@ func validNeeds(profile string) map[string]jobResult {
 	m := map[string]jobResult{}
 	for _, id := range jobIDs {
 		state := "success"
-		if profile == "browser" && id != "plan" && id != "core" && id != "browser" &&
+		if (profile == "browser" || profile == "adr") && id != "plan" && id != "core" &&
+			id != "browser" &&
 			id != "release-contract" {
 			state = "skipped"
 		}
@@ -257,6 +265,9 @@ func TestNativeDocumentPinsItsCompatibilityHost(t *testing.T) {
 }
 
 func validateWorkflow(data []byte) error {
+	if err := validateTrustedBindings(data); err != nil {
+		return err
+	}
 	var w struct {
 		Jobs map[string]struct {
 			Needs any
@@ -308,7 +319,7 @@ func validateWorkflow(data []byte) error {
 			}
 			continue
 		}
-		if j.If != "${{ !cancelled() && needs.plan.outputs.profile != 'browser' }}" ||
+		if j.If != "${{ !cancelled() && needs.plan.outputs.profile != 'browser' && needs.plan.outputs.profile != 'adr' }}" ||
 			j.Needs != "plan" {
 			return errPlan("unexpected full-suite admission")
 		}
@@ -332,11 +343,12 @@ func fixture(t *testing.T) (string, string) {
 	gitTest(t, repo, "config", "user.email", "fixture@example.invalid")
 	gitTest(t, repo, "config", "commit.gpgsign", "false")
 	for _, p := range browserFiles {
-		write(t, filepath.Join(repo, p), "//go:build browser\npackage browser_test\n")
+		write(t, repo, p, "//go:build browser\npackage browser_test\n")
 	}
 	write(
 		t,
-		filepath.Join(repo, "go.mod"),
+		repo,
+		"go.mod",
 		"module github.com/devantler-tech/khoist\n",
 	)
 	gitTest(t, repo, "add", "--", "internal/browser", "go.mod")
@@ -344,12 +356,17 @@ func fixture(t *testing.T) (string, string) {
 	return repo, gitTest(t, repo, "rev-parse", "HEAD")
 }
 
-func write(t *testing.T, path, body string) {
+func write(t *testing.T, directory, path, body string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	root, err := os.OpenRoot(directory)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+	defer func() { _ = root.Close() }()
+	if err := root.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := root.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -370,11 +387,19 @@ func readFixture(t *testing.T, repo, path string) []byte {
 
 func gitTest(t *testing.T, repo string, args ...string) string {
 	t.Helper()
+	if len(args) == 0 {
+		t.Fatal("missing fixture Git operation")
+		return ""
+	}
 	var cmd *exec.Cmd
 	switch args[0] {
 	case "init":
 		cmd = exec.CommandContext(t.Context(), "git", "init", "-q")
 	case "config":
+		if len(args) < 2 {
+			t.Fatal("missing fixture configuration")
+			return ""
+		}
 		switch args[1] {
 		case "user.name":
 			cmd = exec.CommandContext(t.Context(), "git", "config", "user.name", "Fixture")
@@ -392,6 +417,10 @@ func gitTest(t *testing.T, repo string, args ...string) string {
 			t.Fatal("unknown fixture configuration")
 		}
 	case "add":
+		if len(args) < 3 {
+			t.Fatal("missing fixture paths")
+			return ""
+		}
 		cmd = exec.CommandContext(
 			t.Context(),
 			"git",
@@ -404,6 +433,30 @@ func gitTest(t *testing.T, repo string, args ...string) string {
 		cmd = exec.CommandContext(t.Context(), "git", "commit", "-qm", "fixture")
 	case "rev-parse":
 		cmd = exec.CommandContext(t.Context(), "git", "rev-parse", "HEAD")
+	case "adr-blob":
+		cmd = exec.CommandContext(
+			t.Context(),
+			"git",
+			"rev-parse",
+			"--verify",
+			"HEAD:docs/adr/0002-new-decision.md",
+		)
+	case "executable-adr":
+		cmd = exec.CommandContext(
+			t.Context(),
+			"git",
+			"update-index",
+			"--chmod=+x",
+			"--",
+			"docs/adr/0002-new-decision.md",
+		)
+	case "replace":
+		if len(args) != 3 {
+			t.Fatal("missing fixture replacement identities")
+			return ""
+		}
+		cmd = exec.CommandContext(t.Context(), "git", "update-ref", "--stdin")
+		cmd.Stdin = strings.NewReader("create refs/replace/" + args[1] + " " + args[2] + "\n")
 	default:
 		t.Fatal("unknown fixture Git operation")
 	}
@@ -502,28 +555,40 @@ func TestWorkflowClassifierFailureRetainsFullSuite(t *testing.T) {
 		t.Fatal("missing classifier invocation")
 	}
 	for _, tc := range []struct {
-		name, output string
-		code         int
-		want         string
+		name, event, output string
+		code                int
+		want                string
 	}{
-		{"valid browser", "browser", 0, "browser"},
-		{"valid full", "full", 0, "full"},
-		{"classifier failure", "browser", 1, "full"},
-		{"empty output", "", 0, "full"},
-		{"unknown output", "anything", 0, "full"},
-		{"multiple outputs", "browser\nfull", 0, "full"},
+		{"valid browser", "pull_request", "browser", 0, "browser"},
+		{"valid ADR", "pull_request", "adr", 0, "adr"},
+		{"valid full", "pull_request", "full", 0, "full"},
+		{"classifier failure", "pull_request", "browser", 1, "full"},
+		{"ADR classifier failure", "pull_request", "adr", 1, "full"},
+		{"empty output", "pull_request", "", 0, "full"},
+		{"unknown output", "pull_request", "anything", 0, "full"},
+		{"multiple outputs", "pull_request", "browser\nfull", 0, "full"},
+		{"multiple ADR outputs", "pull_request", "adr\nfull", 0, "full"},
+		{"manual", "workflow_dispatch", "adr", 0, "full"},
+		{"merge group", "merge_group", "adr", 0, "full"},
+		{"unknown event", "unknown", "adr", 0, "full"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
-			write(t, filepath.Join(dir, "scripts/ci-plan/main.go"), "trusted fixture")
+			write(t, dir, "scripts/ci-plan/main.go", "trusted fixture")
 			output := filepath.Join(dir, "output")
-			stub := fmt.Sprintf("go() { printf '%%s\\n' '%s'; return %d; }\n", tc.output, tc.code)
+			stub := fmt.Sprintf(`go() {
+  [[ "$#" == 6 && "$1" == run && "$2" == scripts/ci-plan/main.go && "$3" == classify &&
+     "$4" == "$GITHUB_WORKSPACE/ci-candidate" && "$5" == "$BASE_SHA" && "$6" == "$TESTED_SHA" ]] || return 93
+  printf '%%s\n' '%s'
+  return %d
+}
+`, tc.output, tc.code)
 			cmd := exec.CommandContext(t.Context(), "bash")
 			cmd.Stdin = strings.NewReader(stub + run)
 			cmd.Dir = dir
 			cmd.Env = append(
 				os.Environ(),
-				"EVENT_NAME=pull_request",
+				"EVENT_NAME="+tc.event,
 				"BASE_SHA="+strings.Repeat("a", 40),
 				"TESTED_SHA="+strings.Repeat("b", 40),
 				"GITHUB_WORKSPACE="+dir,

@@ -1,4 +1,4 @@
-// ci-plan admits a bounded browser-test-only profile from trusted base code.
+// ci-plan admits bounded browser-test and added-prose-ADR profiles from trusted base code.
 // All uncertain paths retain the full acceptance suite.
 package main
 
@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var browserFiles = []string{
@@ -111,27 +112,35 @@ func gitObject(repo, object string) (string, []byte, error) {
 	return fields[1], data[split+1 : split+1+size], nil
 }
 
-func inventory(repo, sha string) (map[string]bool, error) {
-	kind, data, err := gitObject(repo, sha+":internal/browser")
+func regularFiles(repo, sha, dir string) (map[string]bool, error) {
+	kind, data, err := gitObject(repo, sha+":"+dir)
 	if err != nil {
 		return nil, err
 	}
 	if kind != "tree" {
-		return nil, errPlan("browser inventory is not a Git tree")
+		return nil, errPlan("inventory is not a Git tree")
 	}
 	got := map[string]bool{}
 	for len(data) > 0 {
 		space := bytes.IndexByte(data, ' ')
 		end := bytes.IndexByte(data, 0)
 		if space < 0 || end <= space || len(data) < end+21 || string(data[:space]) != "100644" {
-			return nil, errPlan("browser inventory has a non-regular file")
+			return nil, errPlan("inventory has a non-regular file")
 		}
-		path := "internal/browser/" + string(data[space+1:end])
+		path := dir + "/" + string(data[space+1:end])
 		if got[path] {
-			return nil, errPlan("duplicate browser file")
+			return nil, errPlan("duplicate inventory file")
 		}
 		got[path] = true
 		data = data[end+21:]
+	}
+	return got, nil
+}
+
+func inventory(repo, sha string) (map[string]bool, error) {
+	got, err := regularFiles(repo, sha, "internal/browser")
+	if err != nil {
+		return nil, err
 	}
 	if len(got) != len(browserFiles) {
 		return nil, errPlan("browser inventory changed")
@@ -193,18 +202,39 @@ func admittedTest(repo, sha, path string) error {
 	return nil
 }
 
+// ADRs are inert documentation, not the executable examples under docs/.
+// Verify Git modes as well as blobs: symlinks are blobs too.
+func addedADRs(repo, head string, changes []string) (bool, error) {
+	pathPattern := regexp.MustCompile(`^docs/adr/[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*\.md$`)
+	for i := 0; i < len(changes); i += 2 {
+		if changes[i] != "A" || !pathPattern.MatchString(changes[i+1]) {
+			return false, nil
+		}
+	}
+	files, err := regularFiles(repo, head, "docs/adr")
+	if err != nil {
+		return false, err
+	}
+	for i := 1; i < len(changes); i += 2 {
+		if !files[changes[i]] {
+			return false, errPlan("added ADR is not a regular tree entry")
+		}
+		kind, data, err := gitObject(repo, head+":"+changes[i])
+		if err != nil {
+			return false, err
+		}
+		if kind != "blob" || !utf8.Valid(data) || bytes.IndexByte(data, 0) >= 0 {
+			return false, errPlan("ADR is not bounded UTF-8 prose")
+		}
+	}
+	return true, nil
+}
+
 func classify(repo, base, head string) (string, error) {
 	// Inputs are exact event commits, never branch names or shell expressions.
 	sha := regexp.MustCompile("^[0-9a-f]{40}$")
 	if !sha.MatchString(base) || !sha.MatchString(head) {
 		return "full", errPlan("exact commit IDs required")
-	}
-	allowed, err := inventory(repo, base)
-	if err != nil {
-		return "full", err
-	}
-	if _, err := inventory(repo, head); err != nil {
-		return "full", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -221,7 +251,8 @@ func classify(repo, base, head string) (string, error) {
 		"-z",
 	)
 	cmd.Dir = repo
-	cmd.Stdin = strings.NewReader(base + " " + head + "\n")
+	// --stdin reads a commit followed by its comparison parent, unlike positional trees.
+	cmd.Stdin = strings.NewReader(head + " " + base + "\n")
 	data, err := cmd.Output()
 	if err != nil {
 		return "full", err
@@ -232,6 +263,20 @@ func classify(repo, base, head string) (string, error) {
 	changes := strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00")
 	if len(changes)%2 != 0 {
 		return "full", errPlan("malformed changed paths")
+	}
+	adr, err := addedADRs(repo, head, changes)
+	if err != nil {
+		return "full", err
+	}
+	if adr {
+		return "adr", nil
+	}
+	allowed, err := inventory(repo, base)
+	if err != nil {
+		return "full", err
+	}
+	if _, err := inventory(repo, head); err != nil {
+		return "full", err
 	}
 	for i := 0; i < len(changes); i += 2 {
 		if changes[i] != "M" || !allowed[changes[i+1]] {
@@ -251,7 +296,7 @@ func classify(repo, base, head string) (string, error) {
 }
 
 func checkResults(profile string, needs map[string]jobResult) error {
-	if profile != "full" && profile != "browser" {
+	if profile != "full" && profile != "browser" && profile != "adr" {
 		return errPlan("unknown selected profile")
 	}
 	if len(needs) != len(jobIDs) {
@@ -263,7 +308,8 @@ func checkResults(profile string, needs map[string]jobResult) error {
 			return fmt.Errorf("missing job %s", id)
 		}
 		want := "success"
-		if profile == "browser" && id != "plan" && id != "core" && id != "browser" &&
+		if (profile == "browser" || profile == "adr") && id != "plan" && id != "core" &&
+			id != "browser" &&
 			id != "release-contract" {
 			want = "skipped"
 		}
