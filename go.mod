@@ -1,6 +1,6 @@
 module github.com/devantler-tech/khoist
 
-go 1.26.10
+go 1.27.3
 
 require (
 	github.com/arangodb/kube-arangodb v0.0.0-20260902085934-c8ddcb3ff018
