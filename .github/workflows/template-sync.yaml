@@ -27,11 +27,13 @@ jobs:
     # without this the run fails at startup (reusable-workflow permission check)
     # — both here and in every instance where the job actually runs.
     permissions:
-      contents: write # Push the template synchronization branch.
-      pull-requests: write # Open or update the synchronization pull request.
-    uses: devantler-tech/.github/.github/workflows/template-sync.yaml@16f1a6c96aaf2581885e17389a0e0f9f42387970 # v20.1.1
+      contents: write
+      pull-requests: write
+    uses: devantler-tech/.github/.github/workflows/template-sync.yaml@17ee7092d5ff1748164185ff37fcff5214f9f870 # v20.1.5
     with:
       source-repo-path: devantler-tech/go-template
+      # Push with the App token: GITHUB_TOKEN can never update workflow files, so a
+      # template change under .github/workflows would otherwise stop the sync.
       use-app-token: true
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
