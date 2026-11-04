@@ -113,7 +113,7 @@ After editing the API types in `api/v1alpha1/`, or any `+kubebuilder` marker any
 regenerate them and copy the resource definition to both places:
 
 ```sh
-go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.21.0 \
+go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.23.0 \
   object rbac:roleName=manager-role crd paths=./... \
   output:crd:artifacts:config=config/crd/bases \
   output:rbac:artifacts:config=config/rbac

@@ -196,10 +196,10 @@ CloudNativePG operator and signed owned AGE image. It exercises native SQL, hybr
 hybrid Graph queries, exact grant denials, password rotation and retained database lifecycle.
 See `docs/real-postgresql-acceptance.md`.
 
-API type or marker changes require deep-copy code, CRDs, and RBAC to be regenerated with controller-tools v0.21.0. Distribute the generated CRD to the chart and release artifact; all three copies must remain identical:
+API type or marker changes require deep-copy code, CRDs, and RBAC to be regenerated with controller-tools v0.23.0. Distribute the generated CRD to the chart and release artifact; all three copies must remain identical:
 
 ```bash
-go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.21.0 \
+go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.23.0 \
   object rbac:roleName=manager-role crd paths=./... \
   output:crd:artifacts:config=config/crd/bases \
   output:rbac:artifacts:config=config/rbac
