@@ -3,7 +3,7 @@ module github.com/devantler-tech/khoist/tests/provider/fixture
 go 1.27.3
 
 require (
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 	go.mongodb.org/mongo-driver/v2 v2.9.2
 )
 
