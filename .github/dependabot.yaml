@@ -23,6 +23,15 @@ updates:
       # devantler-tech actions/workflows are our own code — bump now, no cooldown.
       exclude:
         - "devantler-tech/*"
+    groups:
+      # One shared workflow release can update several pins and start a full CI run for each.
+      shared-workflows:
+        applies-to: version-updates
+        patterns:
+          - "devantler-tech/.github/.github/workflows/*"
+        update-types:
+          - minor
+          - patch
     ignore:
       # The platform only accepts publisher revisions it has approved for this
       # consumer; move this pin by hand once devantler-tech/platform#5275 approves
