@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/jackc/pgx/v5 v5.12.0
-	go.mongodb.org/mongo-driver/v2 v2.9.2
+	go.mongodb.org/mongo-driver/v2 v2.9.3
 )
 
 require (
