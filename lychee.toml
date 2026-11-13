@@ -13,6 +13,9 @@ exclude = [
   # Controller-minted distribution IRIs identify metadata; they are not HTTP resources.
   # The EDC acceptance binds them to the actual controller snapshot and rejects changed IDs.
   "^https://devantler\\.tech/\\.well-known/data-product/distribution/[0-9a-f]{64}$",
+  # Dublin Core term IRIs name RDF properties in JSON-LD contexts and fixtures; they are
+  # vocabulary identifiers, not pages. purl.org answering HTTP 503 must not fail a check.
+  "^https?://purl\\.org/dc/terms/[A-Za-z]*$",
   "(^|/)assets/(product|registry)\\.css$",
   "(^|/)openapi\\.json$",
   # This Go API route is exercised by handler and browser tests, not a local file.
