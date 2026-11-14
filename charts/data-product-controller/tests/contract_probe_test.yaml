@@ -77,21 +77,21 @@ tests:
       contractProbe.url: http://example.com/schema
     asserts:
       - failedTemplate:
-          errorPattern: "at '/contractProbe/url': 'http://example\\.com/schema' does not match pattern"
+          errorPattern: "at '/contractProbe/url': 'http:[/][/]example[.]com/schema' does not match pattern"
   - it: rejects a contract URL with credentials
     set:
       <<: *enabled
       contractProbe.url: https://user@example.com/schema
     asserts:
       - failedTemplate:
-          errorPattern: "at '/contractProbe/url': 'https://user@example\\.com/schema' does not match pattern"
+          errorPattern: "at '/contractProbe/url': 'https:[/][/]user@example[.]com/schema' does not match pattern"
   - it: rejects a contract URL with a query
     set:
       <<: *enabled
       contractProbe.url: "https://example.com/schema?token=secret"
     asserts:
       - failedTemplate:
-          errorPattern: "at '/contractProbe/url': 'https://example\\.com/schema\\?token=secret' does not match pattern"
+          errorPattern: "at '/contractProbe/url': 'https:[/][/]example[.]com/schema[?]token=secret' does not match pattern"
   - it: rejects a contract URL that would expand an environment variable
     set:
       <<: *enabled
