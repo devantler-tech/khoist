@@ -158,6 +158,12 @@ golangci-lint run --build-tags=browser ./internal/browser/...
 (cd tests/provider/fixture && go test -race -count=1 ./... && go vet ./...)
 ```
 
+`scripts/chart.test.sh` runs the chart's helm-unittest suites in
+`charts/data-product-controller/tests/`, so it needs the helm-unittest plugin at the version CI pins
+(`helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.1`). Assert
+rendered chart behavior there, including invalid values that must fail to render; keep bash only
+for checks helm-unittest cannot express, such as the Kubernetes version gate and render equality.
+
 Workflow changes also require `actionlint` and `zizmor`.
 
 The required core job runs the `admission`-tagged migration checkpoint against

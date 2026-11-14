@@ -2,8 +2,9 @@
 set -eu
 repo_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 chart="$repo_root/charts/data-product-controller"
-default=$(helm template controller "$chart" --namespace data-product-system)
-printf '%s' "$default" | yq ea -o=json -I=0 'select(.kind == "Deployment") | .spec.template.spec.containers[] | select(.name == "product")' - | jq -e 'has("env") | not' >/dev/null
+# The default demo-product environment is asserted in
+# charts/data-product-controller/tests/ui_contract_test.yaml; this script keeps
+# the render-equality and values-file checks helm-unittest cannot express.
 base=$(helm template controller "$chart" --namespace data-product-system --set route.enabled=true --set route.host=catalog.example)
 for contract in false true invalid; do
 	for appearance in false true invalid; do

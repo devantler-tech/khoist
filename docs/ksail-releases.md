@@ -80,5 +80,5 @@ Run the focused controls:
 ```bash
 go test ./internal/demoproduct ./internal/config
 go test -tags=browser ./internal/browser -run TestKSailReleaseBrowser
-sh scripts/ksail-releases-chart.test.sh
+helm unittest -f tests/ksail_releases_test.yaml charts/data-product-controller
 ```

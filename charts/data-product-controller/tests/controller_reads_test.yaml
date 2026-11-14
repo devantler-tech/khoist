@@ -1,0 +1,45 @@
+# Enabling observation features must never widen what the controller can read.
+# Ported from scripts/connector-chart.test.sh and scripts/contract-chart.test.sh (#619).
+suite: controller read scope
+release:
+  name: data-product-controller
+  namespace: data-product-system
+tests:
+  - it: grants no workload, Secret or wildcard reads with connector readiness off
+    set:
+      connectorReadiness.enabled: false
+    asserts: &no_workload_reads
+      - matchRegex:
+          path: rules[*].resources[*]
+          pattern: ^(deployments|secrets|\*)$
+        not: true
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].resources[*]
+          pattern: ^(deployments|secrets|\*)$
+        not: true
+        documentSelector:
+          path: kind
+          value: ClusterRole
+          matchMany: true
+          skipEmptyTemplates: true
+  - it: grants no workload, Secret or wildcard reads with connector readiness on
+    set:
+      connectorReadiness.enabled: true
+    asserts: *no_workload_reads
+  - it: grants no workload, Secret or wildcard reads with contract observation on
+    release:
+      name: dpc
+      namespace: products
+    set:
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      contractReadiness.enabled: true
+      contractProbe.enabled: true
+      contractProbe.url: https://contracts.example.com/schema
+      contractProbe.targetCIDR: 192.0.2.1/32
+      contractProbe.monitorPodLabels.app: monitor
+    asserts: *no_workload_reads

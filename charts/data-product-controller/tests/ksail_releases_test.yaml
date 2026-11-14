@@ -1,0 +1,98 @@
+# The optional KSail releases product: published API-only against its real
+# public contract, never gated at runtime. Ported from
+# scripts/ksail-releases-chart.test.sh (#619).
+suite: KSail releases product
+release:
+  name: products
+  namespace: products
+tests:
+  - it: serves the standard release interfaces without a runtime gate
+    template: templates/demo-deployment.yaml
+    documentSelector: &product
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: product
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "KSAIL_RELEASES_ENABLED")]
+  - it: publishes no product while disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/ksail-releases-product.yaml
+      - notEqual:
+          path: metadata.name
+          value: ksail-releases
+        documentSelector:
+          path: kind
+          value: DataProduct
+          matchMany: true
+          skipEmptyTemplates: true
+
+  - it: does not restore the retired runtime gate when publication is enabled
+    set: &shared
+      route.enabled: true
+      route.host: products.example.test
+      demoProduct.ksailReleases.enabled: true
+      uiContract.enabled: true
+      uiAppearance.enabled: true
+    template: templates/demo-deployment.yaml
+    documentSelector: *product
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "KSAIL_RELEASES_ENABLED")]
+  - it: binds the actual API, contract and namespace without UI metadata
+    set: *shared
+    template: templates/ksail-releases-product.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: DataProduct
+      - equal:
+          path: metadata.name
+          value: ksail-releases
+      - equal:
+          path: metadata.namespace
+          value: products
+      - equal:
+          path: spec.id
+          value: https://github.com/devantler-tech/ksail/releases
+      - equal:
+          path: spec.outputs[0].url
+          value: https://api.github.com/repos/devantler-tech/ksail/releases
+      - equal:
+          path: spec.outputs[0].contractUrl
+          value: https://products.example.test/products/harbour/ksail-releases/openapi.json
+      - notExists:
+          path: spec.ui
+  - it: publishes an independently hosted product at its actual public URL
+    set:
+      demoProduct.publicBaseURL: https://harbour.example.test
+      demoProduct.ksailReleases.enabled: true
+    template: templates/ksail-releases-product.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: ksail-releases
+      - notExists:
+          path: spec.ui
+      - equal:
+          path: spec.outputs[0].contractUrl
+          value: https://harbour.example.test/ksail-releases/openapi.json
+
+  - it: refuses publication without its workload
+    set:
+      demoProduct.enabled: false
+      demoProduct.ksailReleases.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: ksailReleases requires demoProduct\.enabled
+  - it: refuses publication without a public URL
+    set:
+      demoProduct.ksailReleases.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: ksailReleases requires a publicBaseURL or enabled public route

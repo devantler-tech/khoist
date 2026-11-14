@@ -1,0 +1,237 @@
+# The controller's leader-election grant is exact and release-local.
+# Ported from scripts/chart.test.sh assert_leader_events (#619).
+suite: leader-election RBAC
+release:
+  name: data-product-controller
+  namespace: data-product-system
+tests:
+  - it: grants Lease and core-group Event create/patch only through one release-local Role
+    template: templates/rbac.yaml
+    documentSelector: &role
+      path: kind
+      value: Role
+    asserts:
+      - equal:
+          path: metadata.name
+          value: data-product-controller-leader-election
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+      # The exact rule list rules out other Event groups, resources, verbs and wildcards.
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [coordination.k8s.io]
+              resources: [leases]
+              verbs: [get, list, watch, create, update, patch, delete]
+            - apiGroups: [""]
+              resources: [events]
+              verbs: [create, patch]
+  - it: gives the ClusterRole no Event, Lease or wildcard access
+    template: templates/rbac.yaml
+    documentSelector:
+      path: kind
+      value: ClusterRole
+    asserts:
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [data.devantler.tech]
+              resources: [dataproducts]
+              verbs: [get, list, watch]
+            - apiGroups: [data.devantler.tech]
+              resources: [dataproducts/status]
+              verbs: [get, patch, update]
+  - it: binds the Event role to the controller ServiceAccount only, in the release namespace
+    template: templates/rbac.yaml
+    documentSelector: &binding
+      path: kind
+      value: RoleBinding
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: data-product-controller-leader-election
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: data-product-controller
+              namespace: data-product-system
+  - it: runs the controller as the bound ServiceAccount
+    template: templates/controller-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: data-product-controller
+
+  # Chart-wide: the leader-election Role and RoleBinding are the only ones, and
+  # no Role or ClusterRole anywhere grants Events or Leases cluster-wide or uses wildcards.
+  - it: renders no other Role or RoleBinding and no cluster-wide Event, Lease or wildcard grant anywhere
+    asserts: &chart_wide
+      - matchRegex:
+          path: metadata.name
+          pattern: ^data-product-controller-leader-election$
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: metadata.name
+          pattern: ^data-product-controller-leader-election$
+        documentSelector:
+          path: kind
+          value: RoleBinding
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].resources[*]
+          pattern: ^(events|leases|\*)$
+        not: true
+        documentSelector:
+          path: kind
+          value: ClusterRole
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].apiGroups[*]
+          pattern: ^\*$
+        not: true
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].resources[*]
+          pattern: ^\*$
+        not: true
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].verbs[*]
+          pattern: ^\*$
+        not: true
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].apiGroups[*]
+          pattern: ^\*$
+        not: true
+        documentSelector:
+          path: kind
+          value: ClusterRole
+          matchMany: true
+          skipEmptyTemplates: true
+      - matchRegex:
+          path: rules[*].verbs[*]
+          pattern: ^\*$
+        not: true
+        documentSelector:
+          path: kind
+          value: ClusterRole
+          matchMany: true
+          skipEmptyTemplates: true
+  - it: renders no other Role, RoleBinding, Event or wildcard grant in an alternate namespace
+    release:
+      namespace: alternate-products
+    asserts: *chart_wide
+
+  - it: keeps the grant and its binding in an alternate release namespace
+    release:
+      namespace: alternate-products
+    template: templates/rbac.yaml
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: alternate-products
+        documentSelector: *role
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [coordination.k8s.io]
+              resources: [leases]
+              verbs: [get, list, watch, create, update, patch, delete]
+            - apiGroups: [""]
+              resources: [events]
+              verbs: [create, patch]
+        documentSelector: *role
+      - equal:
+          path: metadata.namespace
+          value: alternate-products
+        documentSelector: *binding
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: data-product-controller-leader-election
+        documentSelector: *binding
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: data-product-controller
+              namespace: alternate-products
+        documentSelector: *binding
+
+  # Negative self-checks: the binding assertion above must reject a widened or
+  # redirected binding. The post-renderer mutates the render (idempotently,
+  # because helm-unittest may apply it more than once) and the same assertion
+  # is required to fail.
+  - it: rejects a binding with an additional subject
+    template: templates/rbac.yaml
+    documentSelector: *binding
+    postRenderer:
+      cmd: yq
+      args:
+        [
+          ea,
+          '(select(.kind == "RoleBinding").subjects) |= (.[0:1] + [{"kind": "User", "name": "other-user"}])',
+          "-",
+        ]
+    asserts:
+      - lengthEqual:
+          path: subjects
+          count: 2
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: data-product-controller
+              namespace: data-product-system
+        not: true
+  - it: rejects a binding to another ServiceAccount
+    template: templates/rbac.yaml
+    documentSelector: *binding
+    postRenderer:
+      cmd: yq
+      args:
+        [
+          ea,
+          '(select(.kind == "RoleBinding").subjects[0].name) = "other-account"',
+          "-",
+        ]
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: other-account
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: data-product-controller
+              namespace: data-product-system
+        not: true

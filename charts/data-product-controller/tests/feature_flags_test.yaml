@@ -1,0 +1,182 @@
+# Release flags reach the controller unchanged, default off, and only accept booleans.
+# Ported from scripts/chart.test.sh and the composition, engine-provider and
+# connector chart scripts (#619). values.schema.json does the rejecting; these
+# tests assert that each invalid value still fails to render, for that reason.
+suite: controller feature flags
+templates:
+  - templates/controller-deployment.yaml
+release:
+  name: data-product-controller
+  namespace: data-product-system
+tests:
+  - it: renders the controller container first
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: controller
+  - it: defaults every release flag off and invents no DCAT identity
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "PROVISIONED_SOURCES_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "DCAT_CATALOG_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "DCAT_CATALOG_ID")].value
+          value: ""
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "REGISTRY_DISCOVERY_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "REGISTRY_LINEAGE_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "COMPOSITION_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "CONNECTOR_READINESS_ENABLED")].value
+          value: "false"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "ENGINE_PROVIDERS_ENABLED")].value
+          value: "false"
+
+  - it: enables provisioned sources explicitly
+    set:
+      provisionedSources.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "PROVISIONED_SOURCES_ENABLED")].value
+          value: "true"
+
+  - it: enables registry discovery explicitly
+    release:
+      namespace: discovery-system
+    set:
+      registryDiscovery.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "REGISTRY_DISCOVERY_ENABLED")].value
+          value: "true"
+  - it: enables dependency tracing explicitly
+    release:
+      namespace: lineage-system
+    set:
+      registryLineage.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "REGISTRY_LINEAGE_ENABLED")].value
+          value: "true"
+
+  - it: enables the DCAT catalog and passes its identity through unchanged
+    set:
+      dcatCatalog.enabled: true
+      dcatCatalog.id: urn:example:catalog:harbour
+      route.enabled: true
+      route.host: data-products.example.test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "DCAT_CATALOG_ENABLED")].value
+          value: "true"
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "DCAT_CATALOG_ID")].value
+          value: urn:example:catalog:harbour
+  - it: requires an identity when the DCAT catalog is enabled
+    set:
+      dcatCatalog.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/dcatCatalog/id': minLength: got 0, want 1"
+  - it: rejects a blank DCAT identity
+    set:
+      dcatCatalog.enabled: true
+      dcatCatalog.id: "   "
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/dcatCatalog/id': '   ' does not match pattern"
+  - it: rejects a non-boolean DCAT flag
+    set:
+      dcatCatalog.enabled: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/dcatCatalog/enabled': got string, want boolean"
+  - it: rejects a non-string DCAT identity
+    set:
+      dcatCatalog.id: 42
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/dcatCatalog/id': got number, want string"
+  - it: rejects a DCAT identity that would expand environment variables
+    set:
+      dcatCatalog.enabled: true
+      dcatCatalog.id: https://example.test/catalog/$(TOKEN)
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/dcatCatalog/id': 'not' failed"
+
+  - it: enables composition explicitly
+    release:
+      name: controller
+    set:
+      composition.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "COMPOSITION_ENABLED")].value
+          value: "true"
+  - it: rejects an invalid composition flag
+    release:
+      name: controller
+    set:
+      composition.enabled: invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/composition/enabled': got string, want boolean"
+
+  - it: passes an explicitly disabled engine-provider flag through
+    release:
+      name: controller
+    set:
+      engineProviders.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "ENGINE_PROVIDERS_ENABLED")].value
+          value: "false"
+  - it: enables engine providers explicitly
+    release:
+      name: controller
+    set:
+      engineProviders.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "ENGINE_PROVIDERS_ENABLED")].value
+          value: "true"
+  - it: defaults engine providers off in the default namespace
+    release:
+      name: controller
+      namespace: default
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "ENGINE_PROVIDERS_ENABLED")].value
+          value: "false"
+  - it: rejects an invalid engine-provider flag
+    release:
+      name: controller
+    set:
+      engineProviders.enabled: invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/engineProviders/enabled': got string, want boolean"
+
+  - it: enables connector readiness explicitly
+    set:
+      connectorReadiness.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "CONNECTOR_READINESS_ENABLED")].value
+          value: "true"
+  - it: rejects an invalid connector readiness flag
+    set:
+      connectorReadiness.enabled: invalid
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/connectorReadiness/enabled': got string, want boolean"
