@@ -121,8 +121,14 @@ tests:
       - failedTemplate:
           errorPattern: "contractProbe requires image.digest pinned to a released sha256 digest"
   - it: rejects a probe without monitor selection
+    # Spelled out rather than merged from *enabled: helm-unittest applies `set` keys in map
+    # order, so `monitorPodLabels: null` beside `monitorPodLabels.app` would race.
     set:
-      <<: *enabled
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      contractReadiness.enabled: true
+      contractProbe.enabled: true
+      contractProbe.url: https://contracts.example.com/schema
+      contractProbe.targetCIDR: 192.0.2.1/32
       contractProbe.monitorPodLabels: null
     asserts:
       - failedTemplate:
