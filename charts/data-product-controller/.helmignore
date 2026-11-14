@@ -1,0 +1,4 @@
+# Development-only files stay out of the packaged chart: the helm-unittest
+# suites and this file itself.
+.helmignore
+tests/

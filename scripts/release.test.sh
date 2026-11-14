@@ -54,8 +54,6 @@ container_count=$(yq '[.spec.template.spec.containers[] | select(.name == "data-
 [ "$(yq '.spec.template.spec.containers[] | select(.name == "data-product-controller") | .image' "$deployment")" = 'ghcr.io/devantler-tech/khoist:latest' ] ||
 	fail 'publish-app must receive the expected mutable image placeholder'
 
-sh "$repo_root/scripts/chart-image.test.sh"
-
 [ "$(yq '.namespace' "$deploy_kustomization")" = 'data-product-system' ] ||
 	fail 'deploy kustomization must target data-product-system'
 [ "$(yq '[.resources[] | select(. == "namespace.yaml")] | length' "$deploy_kustomization")" = '1' ] ||

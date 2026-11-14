@@ -1,0 +1,187 @@
+# Default install: which resources exist, where they live, and how they run.
+# Ported from scripts/chart.test.sh (#619).
+suite: default install
+release:
+  name: data-product-controller
+  namespace: data-product-system
+tests:
+  - it: renders exactly the controller and demo-product workloads, each with one non-root container
+    documentSelector: &deployments
+      path: kind
+      value: Deployment
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^data-product-controller(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+  - it: renders both expected workloads
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller
+          namespace: data-product-system
+        template: templates/controller-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller-harbour
+          namespace: data-product-system
+          any: true
+        template: templates/demo-deployment.yaml
+
+  - it: isolates controller and demo-product ingress with exactly two NetworkPolicies
+    documentSelector:
+      path: kind
+      value: NetworkPolicy
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^data-product-controller(-harbour)?$
+  - it: renders both NetworkPolicies
+    template: templates/network-policy.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: NetworkPolicy
+
+  - it: renders no HTTPRoute, no route-only product and no CRD by default
+    asserts:
+      - isKind:
+          of: HTTPRoute
+        not: true
+      - isKind:
+          of: CustomResourceDefinition
+        not: true
+      - notEqual:
+          path: metadata.name
+          value: harbour-observations
+
+  - it: grants Lease access only in the release namespace
+    template: templates/rbac.yaml
+    asserts:
+      - containsDocument:
+          kind: RoleBinding
+          apiVersion: rbac.authorization.k8s.io/v1
+          any: true
+      - notContains:
+          path: rules
+          content:
+            resources: [leases]
+          any: true
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: [coordination.k8s.io]
+            resources: [leases]
+            verbs: [get, list, watch, create, update, patch, delete]
+          count: 1
+        documentSelector:
+          path: kind
+          value: Role
+
+  - it: keeps every namespaced resource in the release namespace
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: Deployment
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: Service
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: ServiceAccount
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: Role
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: RoleBinding
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.namespace
+          value: data-product-system
+        documentSelector:
+          path: kind
+          value: NetworkPolicy
+          matchMany: true
+          skipEmptyTemplates: true
+
+  - it: runs the controller as the nonroot image user and group with a CPU limit
+    template: templates/controller-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532
+      - equal:
+          path: spec.template.spec.securityContext.runAsGroup
+          value: 65532
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 100m
+  - it: limits the demo product's CPU and gives it no Kubernetes API token
+    template: templates/demo-deployment.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: product
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 50m
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: declares no retired registry UI flag and no public URL by default
+    documentSelector: *deployments
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_UI_ENABLED
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PUBLIC_BASE_URL
+          any: true

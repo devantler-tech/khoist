@@ -1,0 +1,58 @@
+# With the HTTP source and contract probe enabled, all four workloads still run as non-root.
+# Ported from scripts/chart.test.sh (#619).
+suite: optional workloads
+release:
+  name: data-product-controller
+  namespace: data-product-system
+set:
+  image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  httpSource.enabled: true
+  httpSource.secretName: existing-export
+  httpSource.sourceCIDR: 192.0.2.10/32
+  httpSource.consumerPodLabels.app: trusted-consumer
+  contractProbe.enabled: true
+  contractProbe.url: https://contracts.example.com/schema
+  contractProbe.targetCIDR: 192.0.2.1/32
+  contractProbe.monitorPodLabels.app: monitor
+tests:
+  - it: renders exactly four workloads, each with one non-root container
+    documentSelector:
+      path: kind
+      value: Deployment
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^data-product-controller(-harbour|-http-source|-contract-probe)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+  - it: renders all four expected workloads
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller
+        template: templates/controller-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller-harbour
+          any: true
+        template: templates/demo-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller-http-source
+          any: true
+        template: templates/http-source.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: data-product-controller-contract-probe
+          any: true
+        template: templates/contract-probe.yaml

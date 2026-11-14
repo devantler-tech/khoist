@@ -1,0 +1,136 @@
+# Contract observation: off by default, an isolated probe when enabled, and
+# unsafe probe settings refused. Ported from scripts/contract-chart.test.sh (#619).
+suite: contract probe
+release:
+  name: dpc
+  namespace: products
+tests:
+  - it: defaults contract observation off
+    template: templates/controller-deployment.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: dpc
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "CONTRACT_READINESS_ENABLED")].value
+          value: "false"
+  - it: renders no probe workload by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/contract-probe.yaml
+      - notEqual:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: contract-probe
+
+  - it: runs the probe's own binary without an API token, read-only, gated on its readiness
+    set: &enabled
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      contractReadiness.enabled: true
+      contractProbe.enabled: true
+      contractProbe.url: https://contracts.example.com/schema
+      contractProbe.targetCIDR: 192.0.2.1/32
+      contractProbe.monitorPodLabels.app: monitor
+    template: templates/contract-probe.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /contract-probe
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: contract-probe
+  - it: limits probe egress to the declared address over TLS and ingress to explicit monitors
+    set: *enabled
+    template: templates/contract-probe.yaml
+    documentSelector:
+      path: kind
+      value: NetworkPolicy
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: contract-probe
+      - equal:
+          path: spec.egress[0].to[0].ipBlock.cidr
+          value: 192.0.2.1/32
+      - equal:
+          path: spec.egress[0].ports[0].port
+          value: 443
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels.app
+          value: monitor
+
+  - it: rejects a plain-HTTP contract URL
+    set:
+      <<: *enabled
+      contractProbe.url: http://example.com/schema
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/url': 'http://example\\.com/schema' does not match pattern"
+  - it: rejects a contract URL with credentials
+    set:
+      <<: *enabled
+      contractProbe.url: https://user@example.com/schema
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/url': 'https://user@example\\.com/schema' does not match pattern"
+  - it: rejects a contract URL with a query
+    set:
+      <<: *enabled
+      contractProbe.url: "https://example.com/schema?token=secret"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/url': 'https://example\\.com/schema\\?token=secret' does not match pattern"
+  - it: rejects a contract URL that would expand an environment variable
+    set:
+      <<: *enabled
+      contractProbe.url: "https://example.com/$(CONTRACT_READINESS_ENABLED)"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/url': 'not' failed"
+  - it: rejects a contract URL with an escaped expansion
+    set:
+      <<: *enabled
+      contractProbe.url: "https://example.com/$$schema"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/url': 'not' failed"
+  - it: rejects an unrestricted probe target
+    set:
+      <<: *enabled
+      contractProbe.targetCIDR: 0.0.0.0/0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe/targetCIDR': '0\\.0\\.0\\.0/0' does not match pattern"
+  - it: rejects an unpinned image
+    set:
+      <<: *enabled
+      image.digest: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "contractProbe requires image.digest pinned to a released sha256 digest"
+  - it: rejects a probe without monitor selection
+    set:
+      <<: *enabled
+      contractProbe.monitorPodLabels: null
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/contractProbe': missing property 'monitorPodLabels'"
+  - it: rejects the default namespace
+    release:
+      namespace: default
+    set: *enabled
+    asserts:
+      - failedTemplate:
+          errorPattern: contractProbe requires an explicit non-default product namespace

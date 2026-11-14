@@ -1,0 +1,83 @@
+# A hosted install routes the demo product publicly and publishes it with its real URLs.
+# Ported from scripts/chart.test.sh (#619).
+suite: public route
+release:
+  name: data-product-controller
+  namespace: default
+set:
+  route.enabled: true
+  route.host: data-products.example.test
+tests:
+  - it: renders the HTTPRoute
+    template: templates/http-route.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HTTPRoute
+  - it: publishes the demo product at its public API and contract URLs
+    template: templates/data-product.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: DataProduct
+      - equal:
+          path: metadata.name
+          value: harbour-observations
+      - equal:
+          path: spec.outputs[0].url
+          value: https://data-products.example.test/products/harbour/api/observations
+      - equal:
+          path: spec.outputs[0].contractUrl
+          value: https://data-products.example.test/products/harbour/openapi.json
+  - it: does not opt the demo product into DCAT by default
+    template: templates/data-product.yaml
+    asserts:
+      - notExists:
+          path: metadata.annotations["data.devantler.tech/dcat-type"]
+  - it: declares the demo product's public URL for its opaque-origin CSP
+    template: templates/demo-deployment.yaml
+    documentSelector: &product
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: product
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "PUBLIC_BASE_URL")].value
+          value: https://data-products.example.test/products/harbour
+  - it: declares no retired registry UI flag
+    documentSelector:
+      path: kind
+      value: Deployment
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_UI_ENABLED
+          any: true
+  - it: uses an explicit public URL for a separately hosted demo product
+    set:
+      route.enabled: false
+      demoProduct.publicBaseURL: https://harbour.example.test
+    template: templates/demo-deployment.yaml
+    documentSelector: *product
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "PUBLIC_BASE_URL")].value
+          value: https://harbour.example.test
+  - it: declares dataset semantics when the DCAT catalog is enabled
+    release:
+      namespace: data-product-system
+    set:
+      dcatCatalog.enabled: true
+      dcatCatalog.id: urn:example:catalog:harbour
+    template: templates/data-product.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["data.devantler.tech/dcat-type"]
+          value: Dataset

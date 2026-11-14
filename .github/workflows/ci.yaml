@@ -138,6 +138,27 @@ jobs:
       - name: Validate agent instruction shims
         run: sh scripts/validate-agent-shims.test.sh
 
+      - name: Install verified helm-unittest
+        env:
+          HELM_UNITTEST_VERSION: 1.1.1
+          HELM_UNITTEST_SHA256: 07c4fee69e9402e5f66f35b4f932b66afdf9c848637f06196fc479b501d6ad29
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            --retry 3 --max-time 180 --output "$RUNNER_TEMP/helm-unittest.tgz" \
+            https://github.com/helm-unittest/helm-unittest/releases/download/v1.1.1/helm-unittest-linux-amd64-1.1.1.tgz
+          printf '%s  %s\n' "$HELM_UNITTEST_SHA256" "$RUNNER_TEMP/helm-unittest.tgz" | sha256sum --check -
+          # The release archive carries the binary and plugin.yaml but not the
+          # install hook, so place the verified files where Helm discovers plugins.
+          plugin_dir="$(helm env HELM_PLUGINS)/helm-unittest"
+          mkdir -p "$plugin_dir"
+          tar -xzf "$RUNNER_TEMP/helm-unittest.tgz" -C "$plugin_dir" plugin.yaml untt-linux-amd64
+          installed_version=$(helm plugin list | awk '$1 == "unittest" { print $2 }')
+          if [[ "$installed_version" != "$HELM_UNITTEST_VERSION" ]]; then
+            echo 'installed helm-unittest version does not match the pinned release' >&2
+            exit 1
+          fi
+
       - name: Validate chart behavior
         run: sh scripts/chart.test.sh
 

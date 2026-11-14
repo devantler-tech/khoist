@@ -1,0 +1,426 @@
+# The optional HTTP source: absent by default, isolated when enabled, and
+# rejected when its configuration is unsafe. Ported from
+# scripts/http-source-chart.test.sh and scripts/http-source-config-chart.test.sh (#619).
+suite: HTTP source
+release:
+  name: source-test
+  namespace: products
+tests:
+  - it: is absent by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/http-source.yaml
+      - notEqual:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: http-source
+
+  - it: runs its own binary with one replica, the release flag, and no API token
+    set: &enabled
+      httpSource.enabled: true
+      httpSource.secretName: existing-export
+      httpSource.sourceCIDR: 192.0.2.10/32
+      httpSource.consumerPodLabels.app: trusted-consumer
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    template: templates/http-source.yaml
+    documentSelector: &deployment
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: http-source
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /http-source
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "HTTP_SOURCE_ENABLED")].value
+          value: "true"
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: honors the configured replica count
+    set:
+      <<: *enabled
+      httpSource.replicas: 2
+    template: templates/http-source.yaml
+    documentSelector: *deployment
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+  - it: mounts the existing Secret read-only as a directory, so rotation reaches the pod
+    set: *enabled
+    template: templates/http-source.yaml
+    documentSelector: *deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: true
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts[0].subPath
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: existing-export
+  - it: gates readiness on source access and liveness on the process only
+    set: *enabled
+    template: templates/http-source.yaml
+    documentSelector: *deployment
+    asserts:
+      # The source's own timeout is 5s; the probe must outlast it.
+      - greaterOrEqual:
+          path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+          value: 6
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+
+  - it: isolates ingress to explicit consumers and egress to the declared address
+    set: *enabled
+    template: templates/http-source.yaml
+    documentSelector:
+      path: kind
+      value: NetworkPolicy
+    asserts:
+      - lengthEqual:
+          path: spec.policyTypes
+          count: 2
+      - contains:
+          path: spec.policyTypes
+          content: Ingress
+      - contains:
+          path: spec.policyTypes
+          content: Egress
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels.app
+          value: trusted-consumer
+      - notExists:
+          path: spec.ingress[0].from[0].namespaceSelector
+      - equal:
+          path: spec.egress[0].to[0].ipBlock.cidr
+          value: 192.0.2.10/32
+      - equal:
+          path: spec.egress[0].ports[0].port
+          value: 443
+      - lengthEqual:
+          path: spec.ingress
+          count: 1
+
+  - it: creates no credentials, API authority, product registration or public route
+    set: *enabled
+    documentSelector:
+      path: metadata.labels["app.kubernetes.io/component"]
+      value: http-source
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - isKind:
+          of: DataProduct
+        not: true
+      - isKind:
+          of: HTTPRoute
+        not: true
+      - isKind:
+          of: Role
+        not: true
+      - isKind:
+          of: ClusterRole
+        not: true
+      - isKind:
+          of: RoleBinding
+        not: true
+      - isKind:
+          of: ClusterRoleBinding
+        not: true
+      - isKind:
+          of: Secret
+        not: true
+
+  - it: keeps the data Service readiness-gated and free of management traffic
+    set: *enabled
+    template: templates/http-source.yaml
+    documentIndex: 2
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: source-test-http-source
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      # Absent is the safe default; the chart must not opt the data path out of readiness.
+      - notExists:
+          path: spec.publishNotReadyAddresses
+  - it: keeps management on its own Service, observable while the source is unready
+    set: *enabled
+    template: templates/http-source.yaml
+    documentSelector:
+      path: metadata.name
+      value: source-test-http-source-metrics
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.publishNotReadyAddresses
+          value: true
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].targetPort
+          value: management
+
+  # Unsafe settings: values.schema.json or the template must refuse to render.
+  - it: rejects zero replicas
+    set:
+      <<: *enabled
+      httpSource.replicas: 0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': minimum: got 0, want 1"
+  - it: rejects negative replicas
+    set:
+      <<: *enabled
+      httpSource.replicas: -1
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': minimum: got -1, want 1"
+  - it: rejects a fractional replica count
+    set:
+      <<: *enabled
+      httpSource.replicas: 1.5
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': got number, want integer"
+  - it: rejects a fractional replica count given as text, as --set passes it
+    set:
+      <<: *enabled
+      httpSource.replicas: "1.5"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': got string, want integer"
+  - it: rejects a boolean replica count
+    set:
+      <<: *enabled
+      httpSource.replicas: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': got boolean, want integer"
+  - it: rejects a word replica count
+    set:
+      <<: *enabled
+      httpSource.replicas: two
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': got string, want integer"
+  - it: rejects a replica count above int32
+    set:
+      <<: *enabled
+      httpSource.replicas: 2147483648
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': maximum: got"
+  - it: rejects a string replica count
+    set:
+      <<: *enabled
+      httpSource.replicas: "2"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/replicas': got string, want integer"
+  - it: rejects an empty Secret name
+    set:
+      <<: *enabled
+      httpSource.secretName: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': minLength: got 0, want 1"
+  - it: rejects an empty source address
+    set:
+      <<: *enabled
+      httpSource.sourceCIDR: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/sourceCIDR': '' does not match pattern"
+  - it: rejects an unrestricted source address
+    set:
+      <<: *enabled
+      httpSource.sourceCIDR: 0.0.0.0/0
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/sourceCIDR': '0\\.0\\.0\\.0/0' does not match pattern"
+  - it: rejects a source network wider than one address
+    set:
+      <<: *enabled
+      httpSource.sourceCIDR: 192.0.2.10/24
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/sourceCIDR': '192\\.0\\.2\\.10/24' does not match pattern"
+  - it: rejects an unpinned image
+    set:
+      <<: *enabled
+      image.digest: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "httpSource requires image.digest pinned to a released sha256 digest"
+  - it: rejects an empty consumer selector
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: null
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/consumerPodLabels/app': got null, want string"
+  - it: rejects the default namespace
+    release:
+      namespace: default
+    set: *enabled
+    asserts:
+      - failedTemplate:
+          errorPattern: httpSource requires an explicit non-default product namespace
+  - it: requires connection and ingress configuration when enabled
+    set:
+      httpSource.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/consumerPodLabels': minProperties: got 0, want 1"
+      - failedTemplate:
+          errorPattern: "at '/httpSource/sourceCIDR': '' does not match pattern"
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': minLength: got 0, want 1"
+
+  # Secret names must be DNS subdomains and keep their string type.
+  - it: rejects the Secret name a..b
+    set:
+      <<: *enabled
+      httpSource.secretName: "a..b"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': 'a\\.\\.b' does not match pattern"
+  - it: rejects the Secret name a.-b
+    set:
+      <<: *enabled
+      httpSource.secretName: "a.-b"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': 'a\\.-b' does not match pattern"
+  - it: rejects the Secret name a-.b
+    set:
+      <<: *enabled
+      httpSource.secretName: "a-.b"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': 'a-\\.b' does not match pattern"
+  - it: rejects the Secret name .source
+    set:
+      <<: *enabled
+      httpSource.secretName: ".source"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': '\\.source' does not match pattern"
+  - it: rejects the Secret name source.
+    set:
+      <<: *enabled
+      httpSource.secretName: "source."
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': 'source\\.' does not match pattern"
+  - it: rejects the Secret name Source
+    set:
+      <<: *enabled
+      httpSource.secretName: "Source"
+    asserts:
+      - failedTemplate:
+          errorPattern: "at '/httpSource/secretName': 'Source' does not match pattern"
+  - it: accepts the Secret name existing-export
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: existing-export
+    asserts:
+      - notFailedTemplate: {}
+  - it: accepts the Secret name warehouse.daily
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: warehouse.daily
+    asserts:
+      - notFailedTemplate: {}
+  - it: accepts the Secret name aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - notFailedTemplate: {}
+  - it: keeps the Secret name 123 a string
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: "123"
+    template: templates/http-source.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: source-config
+      - isType:
+          path: spec.template.spec.volumes[0].secret.secretName
+          type: string
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: "123"
+  - it: keeps the Secret name null a string
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: "null"
+    template: templates/http-source.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: source-config
+      - isType:
+          path: spec.template.spec.volumes[0].secret.secretName
+          type: string
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: "null"
+  - it: keeps the Secret name yes a string
+    set:
+      <<: *enabled
+      httpSource.consumerPodLabels.app: reader
+      httpSource.secretName: "yes"
+    template: templates/http-source.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: source-config
+      - isType:
+          path: spec.template.spec.volumes[0].secret.secretName
+          type: string
+      - equal:
+          path: spec.template.spec.volumes[0].secret.secretName
+          value: "yes"
+  - it: renders with defaults in the default namespace
+    release:
+      name: source-config
+      namespace: default
+    asserts:
+      - notFailedTemplate: {}

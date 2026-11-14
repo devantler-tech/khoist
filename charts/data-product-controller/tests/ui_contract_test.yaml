@@ -1,0 +1,20 @@
+# The demo product carries no UI configuration by default.
+# Ported from scripts/ui-contract-chart.test.sh (#619). The proof that the
+# retired UI settings leave every render byte-identical, and are absent from
+# values.yaml and values.schema.json, stays in that script.
+suite: retired UI settings
+release:
+  name: controller
+  namespace: data-product-system
+tests:
+  - it: gives the demo product container no environment by default
+    template: templates/demo-deployment.yaml
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: product
+      - notExists:
+          path: spec.template.spec.containers[0].env

@@ -156,7 +156,7 @@ Run the repeatable HTTPS scenarios and chart boundary tests:
 
 ```bash
 go test -race ./internal/httpsource ./cmd/http-source
-sh scripts/http-source-chart.test.sh
+helm unittest -f tests/http_source_test.yaml charts/data-product-controller
 ```
 
 These exercise fixed read-only access, trusted and untrusted TLS, denied writes, response limits,

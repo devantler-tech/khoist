@@ -1,0 +1,131 @@
+# Workload images follow the packaged chart's appVersion, honor overrides, and
+# prefer a digest. Ported from scripts/chart-image.test.sh (#619): the chart
+# override replaces `helm package --version 9.8.7 --app-version 7.6.5`, with
+# versions different from the source placeholders and from each other.
+suite: workload images
+release:
+  name: image-test
+  namespace: products
+chart:
+  version: 9.8.7
+  appVersion: 7.6.5
+tests:
+  - it: renders exactly the two default workloads, one container each
+    documentSelector: &deployments
+      path: kind
+      value: Deployment
+      matchMany: true
+      skipEmptyTemplates: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+  - it: renders both default workloads
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: image-test
+        template: templates/controller-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: image-test-harbour
+          any: true
+        template: templates/demo-deployment.yaml
+  - it: selects the image tag from the packaged appVersion
+    documentSelector: *deployments
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/devantler-tech/khoist:7.6.5
+  - it: honors an explicit image tag
+    set:
+      image.tag: custom-build
+    documentSelector: *deployments
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/devantler-tech/khoist:custom-build
+  - it: honors an explicit image repository
+    set:
+      image.repository: example.test/products/controller
+    documentSelector: *deployments
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: example.test/products/controller:7.6.5
+  - it: prefers a digest over the tag for all three workloads
+    set: &digest
+      image.tag: ignored-tag
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      httpSource.enabled: true
+      httpSource.secretName: existing-export
+      httpSource.sourceCIDR: 192.0.2.10/32
+      httpSource.consumerPodLabels.app: trusted-consumer
+    documentSelector: *deployments
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour|-http-source)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/devantler-tech/khoist@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - it: renders all three digest-pinned workloads
+    set: *digest
+    asserts:
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: image-test
+        template: templates/controller-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: image-test-harbour
+          any: true
+        template: templates/demo-deployment.yaml
+      - containsDocument:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: image-test-http-source
+          any: true
+        template: templates/http-source.yaml
+  - it: strips a leading v from the appVersion, as the publisher's semver tags carry none
+    chart:
+      appVersion: v7.6.5
+    documentSelector: *deployments
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^image-test(-harbour)?$
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/devantler-tech/khoist:7.6.5
