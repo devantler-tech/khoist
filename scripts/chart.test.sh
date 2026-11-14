@@ -60,7 +60,18 @@ for namespace in data-product-system alternate-products; do
 		[ "$(render_count "[select(.kind == \"$kind\")] | length" --namespace "$namespace")" = 1 ] ||
 			fail "the chart must render exactly one $kind ($namespace)"
 	done
+	[ "$(render_count '[select(.kind == "NetworkPolicy")] | length' --namespace "$namespace")" = 2 ] ||
+		fail "chart must isolate controller and demo product ingress with exactly 2 NetworkPolicies ($namespace)"
 done
+
+# Retired settings and default-off resources must not appear anywhere in the
+# render, in any field or document.
+default_render=$(helm template data-product-controller "$chart" --namespace data-product-system)
+hosted_render=$(helm template data-product-controller "$chart" --set route.enabled=true --set route.host=data-products.example.test)
+for needle in REGISTRY_UI_ENABLED PUBLIC_BASE_URL 'kind: HTTPRoute' 'name: harbour-observations' 'kind: CustomResourceDefinition'; do
+	if printf '%s' "$default_render" | grep -F -- "$needle" >/dev/null; then fail "default render must not contain $needle"; fi
+done
+if printf '%s' "$hosted_render" | grep -F -- REGISTRY_UI_ENABLED >/dev/null; then fail 'hosted render must not contain REGISTRY_UI_ENABLED'; fi
 
 # The unit-test suites must never ship in the published chart.
 package_dir=$(mktemp -d)
