@@ -38,6 +38,30 @@ done
 
 cmp "$generated_crd" "$chart_crd" || fail "generated CRD copies differ"
 
+# helm-unittest selects documents per template, so a duplicate workload or binding
+# emitted by another template would still pass the suites. These whole-render
+# totals keep the chart-wide counts.
+# render_count <yq expression> <helm template args...>
+render_count() {
+	expression=$1
+	shift
+	helm template data-product-controller "$chart" "$@" | yq ea "$expression" -
+}
+workloads='[select(.kind == "Deployment") | .spec.template.spec.containers[]] | length'
+optional='--set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --set httpSource.enabled=true --set httpSource.secretName=existing-export --set httpSource.sourceCIDR=192.0.2.10/32 --set httpSource.consumerPodLabels.app=trusted-consumer'
+probe='--set contractProbe.enabled=true --set contractProbe.url=https://contracts.example.com/schema --set contractProbe.targetCIDR=192.0.2.1/32 --set contractProbe.monitorPodLabels.app=monitor'
+[ "$(render_count "$workloads" --namespace data-product-system)" = 2 ] || fail 'default render must have exactly 2 workload containers'
+# shellcheck disable=SC2086 # The option strings are deliberately split into arguments.
+[ "$(render_count "$workloads" --namespace data-product-system $optional)" = 3 ] || fail 'HTTP source render must have exactly 3 workload containers'
+# shellcheck disable=SC2086
+[ "$(render_count "$workloads" --namespace data-product-system $optional $probe)" = 4 ] || fail 'optional render must have exactly 4 workload containers'
+for namespace in data-product-system alternate-products; do
+	for kind in Role RoleBinding; do
+		[ "$(render_count "[select(.kind == \"$kind\")] | length" --namespace "$namespace")" = 1 ] ||
+			fail "the chart must render exactly one $kind ($namespace)"
+	done
+done
+
 # The unit-test suites must never ship in the published chart.
 package_dir=$(mktemp -d)
 trap 'rm -rf "$package_dir"' EXIT HUP INT TERM

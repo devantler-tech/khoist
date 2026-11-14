@@ -71,8 +71,8 @@ tests:
           value: data-product-controller
 
   # Chart-wide: the leader-election Role and RoleBinding are the only ones, and
-  # no Role or ClusterRole anywhere grants Events cluster-wide or uses wildcards.
-  - it: renders no other Role or RoleBinding and no Event or wildcard grant anywhere
+  # no Role or ClusterRole anywhere grants Events or Leases cluster-wide or uses wildcards.
+  - it: renders no other Role or RoleBinding and no cluster-wide Event, Lease or wildcard grant anywhere
     asserts: &chart_wide
       - matchRegex:
           path: metadata.name
@@ -92,7 +92,7 @@ tests:
           skipEmptyTemplates: true
       - matchRegex:
           path: rules[*].resources[*]
-          pattern: ^(events|\*)$
+          pattern: ^(events|leases|\*)$
         not: true
         documentSelector:
           path: kind
