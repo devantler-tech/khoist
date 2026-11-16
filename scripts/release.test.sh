@@ -48,6 +48,11 @@ yq -e '.jobs.publish.permissions | ((length == 3) and (.contents == "read") and 
 	fail 'CD publication must hold only checkout, package and signing permissions'
 yq -e '.jobs.publish.concurrency["cancel-in-progress"] | ((tag == "!!bool") and (. == false))' "$workflow" >/dev/null ||
 	fail 'CD publications must be serialized without cancellation'
+yq -e '.jobs.publish.concurrency.queue == "max"' "$workflow" >/dev/null ||
+	fail 'CD must retain pending release publications instead of replacing them'
+# shellcheck disable=SC2016 # Literal GitHub expression: the old and new publisher share this lock.
+yq -e '.jobs.publish.concurrency.group == "publish-verified-${{ github.repository }}"' "$workflow" >/dev/null ||
+	fail 'CD must share the previous publisher lock to protect mutable aliases during the transition'
 
 smoke=$(yq '.jobs.smoke.steps[] | select(.run != null) | .run' "$workflow")
 # shellcheck disable=SC2016 # $RELEASE_TAG is the literal workflow variable, not a shell expansion.
