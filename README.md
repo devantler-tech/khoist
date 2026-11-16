@@ -275,7 +275,7 @@ The current chart requires Kubernetes **1.35 or newer**. Check the selected rele
 `kubeVersion` field; individual source operators have their own supported versions.
 
 The release workflows are set up to publish, for each release tag, the Helm chart plus a controller
-image and manifest artifact signed by the portfolio's trusted keyless release workflow. That setup
+image and manifest artifact, each signed keylessly by this repository's own workflow on that tag. That setup
 does not prove that a particular version is available. Before you depend on one, confirm that the
 registry serves it:
 
@@ -310,11 +310,25 @@ cosign verify \
   'ghcr.io/devantler-tech/charts/khoist@sha256:<digest>'
 ```
 
-Deployment policy must match this chart identity separately from the shared controller-image and
-manifest publisher. Platform configuration owns signature enforcement and rollout.
+Deployment policy must match this chart identity separately from the controller image and
+manifest identity below. Platform configuration owns signature enforcement and rollout.
 
-The controller image is signed by that shared publisher, not by the chart workflow above. To obtain
-a verified image digest, follow the [released artifact acceptance guide](docs/release-acceptance.md):
+### Verify a released image or manifest artifact
+
+The controller image and the manifest artifact are signed by `cd.yaml`, not by the chart workflow
+above, with the identity
+`https://github.com/devantler-tech/khoist/.github/workflows/cd.yaml@refs/tags/<tag>`:
+
+```bash
+cosign verify \
+  --certificate-identity 'https://github.com/devantler-tech/khoist/.github/workflows/cd.yaml@refs/tags/<tag>' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  'ghcr.io/devantler-tech/khoist@sha256:<digest>'
+```
+
+Use `ghcr.io/devantler-tech/khoist/manifests@sha256:<digest>` for the manifest artifact. Releases
+published before `cd.yaml` signed them itself name the portfolio's shared publisher workflow
+instead; for those, follow the [released artifact acceptance guide](docs/release-acceptance.md):
 its script checks the image and chart signatures of one release against the release tag and source
 revision you supply.
 
