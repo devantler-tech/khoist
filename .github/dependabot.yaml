@@ -25,16 +25,14 @@ updates:
         - "devantler-tech/*"
     groups:
       # One shared workflow release can update several pins and start a full CI run for each.
+      # The publish-app action updates like any dependency: releases are signed by this
+      # repository's own cd.yaml on its tag, whatever action revision runs
+      # (devantler-tech/monorepo ADR 0017), so no platform approval gates its updates.
       shared-workflows:
         applies-to: version-updates
         patterns:
           - "devantler-tech/.github/.github/workflows/*"
+          - "devantler-tech/.github/actions/*"
         update-types:
           - minor
           - patch
-    ignore:
-      # The platform only accepts publisher revisions it has approved for this
-      # consumer and trusts in its image rules; move this pin by hand, in its own
-      # change, once both accept a newer one (an automatic bump broke regeneration
-      # in #489 and #498).
-      - dependency-name: "devantler-tech/.github/.github/workflows/publish-app.yaml"

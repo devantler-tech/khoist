@@ -28,22 +28,39 @@ yq -e '.jobs.release.permissions | (((.issues // "none") == "none") and ((."pull
 yq -e '.jobs.release.permissions | ((.contents == "write") and (."id-token" == "write"))' "$release_workflow" >/dev/null ||
 	fail 'release must retain contents and identity permissions for publication'
 
-yq -e '.jobs.publish.uses | test("^devantler-tech/[.]github/[.]github/workflows/publish-app[.]yaml@[0-9a-f]{40}$")' "$workflow" >/dev/null ||
-	fail 'CD must call the immutable shared publish-app workflow'
-grep -F 'app-name: data-product-controller' "$workflow" >/dev/null ||
-	fail 'CD must identify the controller container for digest pinning'
-grep -F 'enable-caller-pin: true' "$workflow" >/dev/null ||
-	fail 'CD must require an immutable caller identity before signing'
-publisher=$(yq '.jobs.publish.uses' "$workflow")
-smoke=$(yq '.jobs.smoke.steps[] | select(.run != null) | .run' "$workflow")
+# Releases are signed as this repository's own cd.yaml on the release tag
+# (devantler-tech/monorepo ADR 0017): the publish action must run directly in
+# this job, never inside a reusable workflow whose identity the signature would name.
+yq -e '.jobs.publish | has("uses") | not' "$workflow" >/dev/null ||
+	fail 'CD must not sign through a reusable publisher workflow'
+yq -e '[.jobs.publish.steps[] | select(has("uses") and (.uses | test("^devantler-tech/[.]github/actions/publish-app@")))] | length == 1' "$workflow" >/dev/null ||
+	fail 'CD must publish with exactly one publish-app action step'
+yq -e '.jobs.publish.steps[] | select(has("uses") and (.uses | test("^devantler-tech/[.]github/actions/publish-app@"))) | .uses | test("^devantler-tech/[.]github/actions/publish-app@[0-9a-f]{40}$")' "$workflow" >/dev/null ||
+	fail 'CD must pin the publish-app action to a full commit SHA'
+yq -e '.jobs.publish.steps[] | select(has("uses") and (.uses | test("^devantler-tech/[.]github/actions/publish-app@"))) | .with | ((.["app-name"] == "data-product-controller") and ((.mode // "deployment") == "deployment") and (has("oci-name") | not))' "$workflow" >/dev/null ||
+	fail 'CD must build the controller image and pin it into the data-product-controller container'
+yq -e '.jobs.publish.steps[0].uses | test("^actions/checkout@[0-9a-f]{40}$")' "$workflow" >/dev/null ||
+	fail 'CD must check out the release source before publishing'
+# shellcheck disable=SC2016 # ${{ github.sha }} is the literal workflow expression, not a shell expansion.
+yq -e '.jobs.publish.steps[0].with | ((.["persist-credentials"] | ((tag == "!!bool") and (. == false))) and (.ref == "${{ github.sha }}"))' "$workflow" >/dev/null ||
+	fail 'CD must check out the tagged commit without a persisted credential'
+yq -e '.jobs.publish.permissions | ((length == 3) and (.contents == "read") and (.packages == "write") and (."id-token" == "write"))' "$workflow" >/dev/null ||
+	fail 'CD publication must hold only checkout, package and signing permissions'
+yq -e '.jobs.publish.concurrency["cancel-in-progress"] | ((tag == "!!bool") and (. == false))' "$workflow" >/dev/null ||
+	fail 'CD publications must be serialized without cancellation'
+yq -e '.jobs.publish.concurrency.queue == "max"' "$workflow" >/dev/null ||
+	fail 'CD must retain pending release publications instead of replacing them'
+# shellcheck disable=SC2016 # Literal GitHub expression: the old and new publisher share this lock.
+yq -e '.jobs.publish.concurrency.group == "publish-verified-${{ github.repository }}"' "$workflow" >/dev/null ||
+	fail 'CD must share the previous publisher lock to protect mutable aliases during the transition'
 
-identity=$(cd "$repo_root" && go run ./scripts/publisher-identity)
-[ "$identity" = "https://github.com/$publisher" ] ||
-	fail 'publisher identity must resolve from the immutable workflow declaration'
-printf '%s\n' "$smoke" | grep -F "publisher_identity=\$(go run ./scripts/publisher-identity)" >/dev/null ||
-	fail 'published-image verification must resolve its signer from the released workflow'
-printf '%s\n' "$smoke" | grep -F -- "--certificate-identity \"\$publisher_identity\"" >/dev/null ||
-	fail 'published-image verification must trust the exact immutable publisher used by CD'
+smoke=$(yq '.jobs.smoke.steps[] | select(.run != null) | .run' "$workflow")
+# shellcheck disable=SC2016 # $RELEASE_TAG is the literal workflow variable, not a shell expansion.
+printf '%s\n' "$smoke" | grep -F -- '--certificate-identity "https://github.com/devantler-tech/khoist/.github/workflows/cd.yaml@refs/tags/$RELEASE_TAG"' >/dev/null ||
+	fail 'published-image verification must trust only this repository'"'"'s cd.yaml on the release tag'
+if printf '%s\n' "$smoke" | grep -F 'publish-app.yaml' >/dev/null; then
+	fail 'published-image verification must not trust the shared publisher'
+fi
 
 [ -f "$deployment" ] || fail 'deploy/deployment.yaml is required by publish-app'
 cmp "$generated_crd" "$deploy_crd" || fail 'published and generated CRDs differ'
