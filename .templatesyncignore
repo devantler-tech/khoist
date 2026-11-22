@@ -74,14 +74,15 @@ Dockerfile.goreleaser
 .github/codeql/codeql-config.yml
 
 # --- Tenant plumbing that guards the template's own CI and CD ---
-# The template's pin checks guard the template's ci.yaml and cd.yaml. KHoist owns both,
-# its CI does not run these checks, and Dependabot alone keeps its dependencies current,
-# without Renovate. Remove these lines and wire the checks into ci.yaml to adopt them.
+# The template's pin and queue checks guard the template's ci.yaml and cd.yaml. KHoist owns
+# both, its CI does not run these checks, and Dependabot alone keeps its dependencies
+# current, without Renovate. Remove these lines and wire the checks into ci.yaml to adopt them.
 renovate.json
 scripts/publish-pin-approved.sh
 scripts/publish-pin-approved.test.sh
 scripts/workflow-caller-pin-contract.test.sh
 scripts/fixtures/own-publisher.yaml
+scripts/validate-workflow-queues.sh
 
 # --- KHoist's own application ---
 # Ignored wholesale, so a template file added later at a path KHoist already uses can
@@ -124,6 +125,8 @@ scripts/platform-network-floor.test.sh
 scripts/platform-network-floor-contract.test.sh
 scripts/platform-vpa-floor.test.sh
 scripts/platform-vpa-floor-contract.test.sh
+# Reads the template-only validate-stacks.yaml; the template runs it only inside its own CI.
+scripts/validate-workflow-queues.test.sh
 .github/workflows/validate-scaffold.yaml
 
 # --- The scaffold and its stacks (template-only) ---
