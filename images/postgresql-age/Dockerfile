@@ -10,7 +10,7 @@ RUN apt-get update \
         bison=2:3.8.2+dfsg-1+b2 \
         postgresql-server-dev-17=17.11-1.pgdg13+2 \
         libreadline-dev=8.2-6 \
-        zlib1g-dev=1:1.3.dfsg+really1.3.1-1+b1 \
+        zlib1g-dev=1:1.3.dfsg+really1.3.1-1+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY age-release-key.asc age-release.asc /verification/
@@ -39,6 +39,7 @@ RUN apt-get update \
         libssl3t64=3.5.7-1~deb13u3 \
         openssl=3.5.7-1~deb13u3 \
         openssl-provider-legacy=3.5.7-1~deb13u3 \
+        zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/usr/ /usr/
 LABEL org.opencontainers.image.title="Data Product Controller PostgreSQL with Apache AGE" \
