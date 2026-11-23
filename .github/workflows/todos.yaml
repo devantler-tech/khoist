@@ -11,6 +11,6 @@ jobs:
     permissions:
       contents: read # Scan the repository source.
       issues: write # Create and update to-do tracking issues (lowercase: the scanner files the uppercase marker).
-    uses: devantler-tech/.github/.github/workflows/scan-for-todo-comments.yaml@fee89b5082b2a8bef5aabc13388b1ac0f579b370 # v21.7.4
+    uses: devantler-tech/.github/.github/workflows/scan-for-todo-comments.yaml@91442d11ccd6f8cebb403bc21eec6958adbc2920 # v21.12.5
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
