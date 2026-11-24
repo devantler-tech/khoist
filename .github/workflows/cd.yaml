@@ -34,7 +34,7 @@ jobs:
       # signed as this repository's cd.yaml on the release tag (devantler-tech/monorepo
       # ADR 0017), whatever revision of the action runs.
       - name: Publish and sign the release as this repository
-        uses: devantler-tech/.github/actions/publish-app@91442d11ccd6f8cebb403bc21eec6958adbc2920 # v21.12.5
+        uses: devantler-tech/.github/actions/publish-app@70f3c3176699c8e23adbdfea84b46768f34a0976 # v22.0.5
         with:
           app-name: data-product-controller
 
