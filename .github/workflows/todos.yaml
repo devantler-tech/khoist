@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: read # Scan the repository source.
       issues: write # Create and update to-do tracking issues (lowercase: the scanner files the uppercase marker).
+      id-token: write # lets the shared to-do scanner prove its identity to the GitHub token broker (ADR 0020)
     uses: devantler-tech/.github/.github/workflows/scan-for-todo-comments.yaml@70f3c3176699c8e23adbdfea84b46768f34a0976 # v22.0.5
     secrets:
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
