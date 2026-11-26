@@ -23,7 +23,7 @@ jobs:
   triage:
     # Keep portfolio automation disabled in external template copies.
     if: ${{ github.repository_owner == 'devantler-tech' }}
-    uses: devantler-tech/.github/.github/workflows/triage-stale-issues.yaml@18d1882cae769c0057867d91bf7b43ebed1ce1e2 # v22.5.2
+    uses: devantler-tech/.github/.github/workflows/triage-stale-issues.yaml@ad244381360efe464f8fb389bdedaaa974f52f3c # v22.7.3
     permissions:
       issues: write
       actions: write
