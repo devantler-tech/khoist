@@ -7,6 +7,7 @@ root_dir = "website/dist"
 remap = [
   '^https://git\.k8s\.io/community/(contributors/devel/sig-architecture/api-conventions\.md)(#.*)?$ https://raw.githubusercontent.com/kubernetes/community/main/$1$2',
   '^https://github\.com/arangodb/kube-arangodb/blob/([0-9a-f]{40})/(pkg/apis/deployment/v1/[a-z_]+\.go)(#L[0-9]+)?$ https://raw.githubusercontent.com/arangodb/kube-arangodb/$1/$2$3',
+  '^https://github\.com/devantler-tech/khoist/blob/(main|[0-9a-f]{40})/([A-Za-z0-9._/-]+)(#L[0-9]+(?:-L[0-9]+)?)?$ https://raw.githubusercontent.com/devantler-tech/khoist/$1/$2$3',
 ]
 
 exclude = [
