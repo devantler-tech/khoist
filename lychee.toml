@@ -4,6 +4,11 @@
 # Website links resolve against the generated routes. CI builds the site before checking links.
 root_dir = "website/dist"
 
+# Hosted runners can briefly share a documentation site's rate limit. Start the existing
+# exponential backoff at five seconds and keep a bounded retry count.
+max_retries = 3
+retry_wait_time = 5
+
 remap = [
   '^https://git\.k8s\.io/community/(contributors/devel/sig-architecture/api-conventions\.md)(#.*)?$ https://raw.githubusercontent.com/kubernetes/community/main/$1$2',
   '^https://github\.com/arangodb/kube-arangodb/blob/([0-9a-f]{40})/(pkg/apis/deployment/v1/[a-z_]+\.go)(#L[0-9]+)?$ https://raw.githubusercontent.com/arangodb/kube-arangodb/$1/$2$3',
