@@ -2,7 +2,7 @@
 name: "TODOs"
 permissions: {}
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Run it from main: the GitHub token broker gives the project token only to main (ADR 0020).
   push:
     branches: [main]
 
